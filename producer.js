@@ -2,7 +2,43 @@ const zmq = require("zeromq/v5-compat");
 const uuid = require("uuid").v4;
 
 
-(   
+class Producer
+{
+    producer = null;
+    routerAddress = "127.0.0.1";
+    routerPort = 5001;
+
+
+    constructor(args)
+    {
+        this.producer = zmq.socket("dealer");
+        this.producer.identity = `producer-${uuid()}`;
+        this.routerAddress = args.routerAddress ? args.routerAddress : "127.0.0.1";
+        this.routerPort = args.routerPort ? args.routerPort : 5001;
+
+    }
+
+
+    async start()
+    { 
+        producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
+
+    }
+
+
+    enqueue(message)
+    {   
+        console.log(`Sending message ${message}`);
+        
+        producer.send([message]);
+        producer.close();
+
+    }
+
+}
+
+
+/*(   
     async()=>
     {   
         var producer = zmq.socket("dealer");
@@ -16,4 +52,4 @@ const uuid = require("uuid").v4;
 
     }
 
-)()
+)()*/
