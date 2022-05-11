@@ -1,0 +1,1 @@
+A massively scalable work queue implemented in Node.js
