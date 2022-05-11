@@ -13,7 +13,7 @@ class Router
 
 
     constructor(args)
-    {   this.route = zmq.socket("router");
+    {   this.router = zmq.socket("router");
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
