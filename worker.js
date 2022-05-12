@@ -2,10 +2,9 @@ const zmq = require("zeromq/v5-compat");
 const uuid = require("uuid").v4;
 
 
-class Worker
+module.exports = class Worker
 {   
     worker = null;
-    workerId = null;
     routerAddress = "127.0.0.1";
     routerPort = 5001;
 
@@ -13,10 +12,9 @@ class Worker
     constructor(args)
     {
         this.worker = zmq.socket("dealer");
-        this.workerId = `worker-${uuid()}`;
         this.routerAddress = args.routerAddress ? args.routerAddress : "127.0.0.1";
         this.routerPort = args.routerPort ? args.routerPort : 5001;
-        this.worker.identity = workerId;
+        this.worker.identity = `worker-${uuid()}`;
         this.worker.work = this.work;
         
     }
@@ -26,9 +24,9 @@ class Worker
     {   
         var _this = this;
 
-        console.log(`Worker ${workerId} ready`);
+        console.log(`Worker ${this.worker.identity} ready`);
 
-        this.worker.connect(`tcp://${routerAddress}:${routerPort}`)
+        this.worker.connect(`tcp://${this.routerAddress}:${this.routerPort}`)
         this.worker.send([JSON.stringify({command: "ready"})]);
         
         this.worker.on("message", async function()
@@ -37,7 +35,7 @@ class Worker
                 var workload = args[1].toString("utf8");
 
                 //console.log("Workload", workload);
-                var workOutput = await this.worker.work(workload);
+                var workOutput = await _this.worker.work(workload);
                 _this.worker.send([JSON.stringify({command: "workComplete", workOutput: workOutput})]);
 
             });

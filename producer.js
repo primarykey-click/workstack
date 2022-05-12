@@ -2,7 +2,7 @@ const zmq = require("zeromq/v5-compat");
 const uuid = require("uuid").v4;
 
 
-class Producer
+module.exports = class Producer
 {
     producer = null;
     routerAddress = "127.0.0.1";
@@ -19,19 +19,13 @@ class Producer
     }
 
 
-    async start()
-    { 
-        producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
-
-    }
-
-
     enqueue(message)
     {   
+        this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
         console.log(`Sending message ${message}`);
         
-        producer.send([message]);
-        producer.close();
+        this.producer.send([message]);
+        this.producer.close();
 
     }
 

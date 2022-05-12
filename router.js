@@ -3,13 +3,14 @@ const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 
 
-class Router
+module.exports = class Router
 {
     workers = {};
     router = null;
     listenPort = 5001;
     listenInterface = "*";
-    db = "workerDb";
+    dbFile = "workerDb";
+    db = null;
 
 
     constructor(args)
@@ -17,14 +18,18 @@ class Router
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
-        this.db = args.db ? args.db : this.db;
+        this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
 
     }
 
 
     start()
     {   
-        this.router.bind(`tcp://${listenInterface}:${listenPort}`, 
+        var _this = this;
+        this.db = new JsonDB(new JsonDbConfig(this.dbFile, true, false, "/"));
+
+
+        this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`, 
             function(err)
             {   
                 if(err)
@@ -32,12 +37,10 @@ class Router
                 }
 
                 
-                var db = new JsonDB(new JsonDbConfig(this.db, true, false, "/"));
-
-                console.log(`Listening on ${listenInterface}:${listenPort}`);
+                console.log(`Listening on ${_this.listenInterface}:${_this.listenPort}`);
                 
                 
-                this.router.on("message", function()
+                _this.router.on("message", function()
                 {   
                     var args = Array.apply(null, arguments);
                     var clientId = args[0].toString("utf8");
@@ -48,24 +51,24 @@ class Router
                     {   
                         case "ready":
                             
-                            if(!this.workers[clientId])
-                            {   this.workers[clientId] = {};
+                            if(!_this.workers[clientId])
+                            {   _this.workers[clientId] = {};
                             }                    
-                            this.workers[clientId].ready = true;
+                            _this.workers[clientId].ready = true;
                             //console.log(`Workers: ${JSON.stringify(workers)}`);
 
                         break;
 
                         case "executeWork":
                             
-                            db.push(`/${message.queue}/${message.id}`, {start: (new Date()).getTime(), status: "in-progress"});
+                            _this.db.push(`/${message.queue}/${message.id}`, {start: (new Date()).getTime(), status: "in-progress"});
 
-                            for(var workerId of Object.keys(this.workers))
-                            {   var worker = this.workers[workerId];
+                            for(var workerId of Object.keys(_this.workers))
+                            {   var worker = _this.workers[workerId];
 
                                 if(worker.ready)
                                 {   worker.ready = false;
-                                    this.router.send([workerId, "", message.job]);
+                                    _this.router.send([workerId, "", message.job]);
                                     break;                            
                                 }
 
@@ -77,7 +80,7 @@ class Router
                         case "workComplete":
                             
                             console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.workOutput)}`);
-                            this.workers[clientId].ready = true;
+                            _this.workers[clientId].ready = true;
 
                         break;
 
@@ -91,8 +94,5 @@ class Router
             });        
     }
 
-    
-
 }
         
-
