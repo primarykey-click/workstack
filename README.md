@@ -47,3 +47,21 @@ producer.enqueue(JSON.stringify(
     }));
 
 ```
+
+### Authentication
+Currently shared key authentication is available.  To enable this please start the tiers (Router, Worker and Producer) with the following additional parameters:
+
+#### Router
+```
+var router = new Router({authMethod: "sharedKey", authKey: "123"});
+```
+
+#### Worker
+```
+var worker = new Worker({authKey: "123", pingInterval: 30000, queue: "test-queue", work: work});
+```
+
+#### Producer
+```
+var producer = new Producer({authKey: "123"});
+```
