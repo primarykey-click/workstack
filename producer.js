@@ -7,6 +7,7 @@ module.exports = class Producer
     producer = null;
     routerAddress = "127.0.0.1";
     routerPort = 5001;
+    authKey = null;
 
 
     constructor(args)
@@ -15,6 +16,7 @@ module.exports = class Producer
         this.producer.identity = `producer-${uuidEmit()}`;
         this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
         this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
+        this.authKey = args.authKey ? args.authKey : this.authKey;
 
     }
 
@@ -24,8 +26,15 @@ module.exports = class Producer
         var modifiedMessage = JSON.parse(message);
 
         if(!modifiedMessage.id)
-        {   modifiedMessage.id = uuidEmit();            
+        {   
+            modifiedMessage.id = uuidEmit();
+
         }
+            
+        if(this.authKey)
+        {   modifiedMessage.authKey = this.authKey;
+        }
+        
 
         this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
         console.log(`Sending message ${JSON.stringify(modifiedMessage)}`);

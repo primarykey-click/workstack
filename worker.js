@@ -12,6 +12,7 @@ module.exports = class Worker
     queue = null;
     mutex = null;
     status = null;
+    authKey = null;
 
 
     constructor(args)
@@ -20,6 +21,7 @@ module.exports = class Worker
         this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
         this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
         this.pingInterval = args.pingInterval ? args.pingInterval : this.pingInterval;
+        this.authKey = args.authKey ? args.authKey : this.authKey;
         this.queue = args.queue;
         this.worker.identity = `worker-${uuidEmit()}`;
         this.worker.work = args.work;
@@ -36,10 +38,10 @@ module.exports = class Worker
 
         this.worker.connect(`tcp://${this.routerAddress}:${this.routerPort}`)
 
-        this.worker.send([JSON.stringify({command: "ready", queue: this.queue})]);
+        this.sendMessage({command: "ready", queue: this.queue});
         this.status = "ready";
 
-        this._pingRouter();
+        this.pingRouter();
 
         
         this.worker.on("message", async function()
@@ -53,7 +55,7 @@ module.exports = class Worker
                 {
                     case "confirmReady":
                         
-                        _this.worker.send([JSON.stringify({command: "ready", queue: _this.queue})]);
+                        _this.sendMessage({command: "ready", queue: _this.queue});
 
                     break;
 
@@ -66,12 +68,12 @@ module.exports = class Worker
                                 console.log(JSON.stringify(message));
                                 
                                 var output = await _this.worker.work(message.data);
-                                _this.worker.send([JSON.stringify(
+                                _this.sendMessage(
                                     {   command: "workComplete",
                                         queue: message.queue,
                                         workId: message.workId,
                                         output: output
-                                    })]);
+                                    });
                                 
                                 _this.status = "ready";
 
@@ -86,18 +88,33 @@ module.exports = class Worker
     }
 
 
-    _pingRouter()
+    pingRouter()
     {   
         var _this = this;
 
         setTimeout(async function()
             {   await _this.mutex.runExclusive(function ()
                     {   console.log(`Sending ready ${new Date()} at interval ${_this.pingInterval}`);
-                        _this.worker.send([JSON.stringify({command: "ready", queue: _this.queue})]);
-                        _this._pingRouter();
+                        _this.sendMessage({command: "ready", queue: _this.queue});
+                        _this.pingRouter();
                     });           
             }, this.pingInterval);
 
     }
+
+
+    sendMessage(message)
+    {   
+        var modifiedMessage = message;
+
+        if(this.authKey)
+        {   modifiedMessage.authKey = this.authKey;
+        }
+
+        console.log(`Sending message ${JSON.stringify(message)}`);
+
+        this.worker.send([JSON.stringify(modifiedMessage)]);
+
+    }    
 
 }

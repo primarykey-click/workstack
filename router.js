@@ -12,6 +12,8 @@ module.exports = class Router
     listenInterface = "*";
     dbFile = "db.json";
     db = null;
+    authMethod = "none";
+    authKey = "auth.key";
 
 
     constructor(args)
@@ -20,6 +22,8 @@ module.exports = class Router
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
         this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
+        this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
+        this.authKey = args.authKey ? args.authKey : this.authKey;
         this.mutex = new Mutex();
 
     }
@@ -70,7 +74,26 @@ module.exports = class Router
                     var args = Array.apply(null, arguments);
                     var clientId = args[0].toString("utf8");
                     var message = JSON.parse(args[1].toString("utf8"));
+
+                    
+                    switch(_this.authMethod)
+                    {   
+                        case "sharedKey":
+
+                            if(message.authKey !== _this.authKey)
+                            {   
+                                console.log(`Unauthorized or absent auth key: ignoring message ${JSON.stringify(message)}.`);
+
+                                return;
+
+                            }
+
+                        break;
+
+                    }
+
                     console.log(`Received message ${JSON.stringify(message)} from client ${clientId}`);
+
                     
                     switch(message.command)
                     {   
@@ -143,9 +166,7 @@ module.exports = class Router
             {
                 var workItem = null;
 
-                console.log(queue);
-
-                                            
+                
                 try
                 {   
                     workItem = _this.db.getData(`/queues/${queue}/not-started[-1]`);
@@ -153,7 +174,15 @@ module.exports = class Router
                 }
                 catch(err)
                 {   
-                    console.log(err);
+                    if(err.message && err.message.match(/Can't find index -1/g))
+                    {
+                        console.log(`No work items in queue ${queue}`);
+
+                    }
+                    else
+                    {   console.log(err);                       
+                    }
+                    //console.log(err.message);
                     //console.log(`No work items`);
                 
                     return;
