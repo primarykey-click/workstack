@@ -1,5 +1,5 @@
 ## Summary
-A massively scalable work queue implemented in Node.js **(work in progress - not yet production ready)**
+A massively scalable work queue implemented in Node.js **(currently in alpha state)**
 
 
 ## Example Usage
