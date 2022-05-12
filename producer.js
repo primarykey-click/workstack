@@ -21,10 +21,16 @@ module.exports = class Producer
 
     enqueue(message)
     {   
+        var modifiedMessage = message;
+
+        if(!modifiedMessage.id)
+        {   modifiedMessage = uuid();            
+        }
+
         this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
-        console.log(`Sending message ${message}`);
+        console.log(`Sending message ${modifiedMessage}`);
         
-        this.producer.send([message]);
+        this.producer.send([modifiedMessage]);
         this.producer.close();
 
     }

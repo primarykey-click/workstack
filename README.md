@@ -37,13 +37,11 @@ async function work(data)
 
 ### Send Work
 ```
-const uuid = require("uuid").v4;
 const { Producer } = require("../workstack");
 
 var producer = new Producer({});
 producer.enqueue(JSON.stringify(
     {   queue: "test-queue",
-        id: uuid(),
         command: "execWork", 
         data: {vals: ["1", "2"]}
     }));
