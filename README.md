@@ -45,7 +45,6 @@ producer.enqueue(JSON.stringify(
         command: "execWork", 
         data: {vals: ["1", "2"]}
     }));
-
 ```
 
 ### Authentication
