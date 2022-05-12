@@ -28,7 +28,7 @@ async function work(data)
 
 (   async()=>
     {   
-        var worker = new Worker({work: work});
+        var worker = new Worker({pingInterval: 5000, queue: "test-queue", work: work});
         worker.start();
 
     }
