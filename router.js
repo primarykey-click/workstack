@@ -9,7 +9,7 @@ module.exports = class Router
     router = null;
     listenPort = 5001;
     listenInterface = "*";
-    dbFile = "workerDb";
+    dbFile = "db.json";
     db = null;
 
 
@@ -26,7 +26,16 @@ module.exports = class Router
     start()
     {   
         var _this = this;
-        this.db = new JsonDB(new JsonDbConfig(this.dbFile, true, false, "/"));
+        this.db = new JsonDB(new JsonDbConfig(this.dbFile, true, true, "/"));
+
+        try
+        {   this.workers = this.db.getData("/workers");
+        }
+        catch(err)
+        {   
+            console.log("No workers registered");
+
+        }
 
 
         this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`, 
@@ -38,6 +47,20 @@ module.exports = class Router
 
                 
                 console.log(`Listening on ${_this.listenInterface}:${_this.listenPort}`);
+
+
+                for(var workerId of Object.keys(_this.workers))
+                {   
+                    _this.workers[workerId].status = "pending";
+                    _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
+                    
+                    console.log(`Sending confirmReady command to ${workerId}`);
+
+                    _this.router.send([workerId, "", JSON.stringify(
+                        {   command: "confirmReady"
+                        })]);
+        
+                }
                 
                 
                 _this.router.on("message", function()
@@ -53,27 +76,33 @@ module.exports = class Router
                             
                             if(!_this.workers[clientId])
                             {   _this.workers[clientId] = {};
-                            }                    
-                            _this.workers[clientId].ready = true;
-                            //console.log(`Workers: ${JSON.stringify(workers)}`);
+                            }
+
+                            _this.workers[clientId].status = "ready";
+                            _this.workers[clientId].lastActivity = (new Date()).getTime();
+
+                            _this.db.push(`/workers/${clientId}`, _this.workers[clientId]);
+
+                            _this.startWork(clientId, message.queue);
+                            
 
                         break;
-                        
+
 
                         case "execWork":
                             
-                            _this.db.push(`/${message.queue}/${message.id}`, {start: (new Date()).getTime(), status: "in-progress"});
+                            _this.db.push(`/queues/${message.queue}/not-started[]`, 
+                                {   received: (new Date()).getTime(),
+                                    workId: message.id,
+                                    data: message.data
+                                });
 
                             for(var workerId of Object.keys(_this.workers))
                             {   var worker = _this.workers[workerId];
 
-                                if(worker.ready)
+                                if(worker.status == "ready")
                                 {   
-                                    worker.ready = false;
-                                    _this.router.send([workerId, "", JSON.stringify(
-                                        {   command: "execWork",
-                                            data: message.data
-                                        })]);
+                                    _this.startWork(workerId, message.queue);
 
                                     break;
 
@@ -87,7 +116,11 @@ module.exports = class Router
                         case "workComplete":
                             
                             console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.output)}`);
-                            _this.workers[clientId].ready = true;
+                            _this.workers[clientId].status = "ready";
+
+                            _this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
+                                {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
+                            //_this.db.push(`/queues/${message.queue}/${message.workId}`, {completed: (new Date()).getTime(), status: "complete"});
 
                         break;
 
@@ -99,6 +132,61 @@ module.exports = class Router
                 })
 
             });        
+    }
+
+
+    startWork(workerId, queue)
+    {   var workItem = null;
+
+        console.log(queue);
+
+                                    
+        try
+        {   
+            workItem = this.db.getData(`/queues/${queue}/not-started[-1]`);
+
+        }
+        catch(err)
+        {   
+            console.log(err);
+            //console.log(`No work items`);
+        
+            return;
+
+        }
+
+
+        if(!workItem)
+        {
+            console.log(`No work items found: ${JSON.stringify(workItems)}`);
+
+            return;
+
+        }
+
+
+        console.log("Work item: ", JSON.stringify(workItem));
+        console.log(`Assinging work ${workItem.id} to ${workerId}`);
+        
+        this.router.send([workerId, "", JSON.stringify(
+            {   command: "execWork",
+                queue: queue,
+                workId: workItem.workId,
+                data: workItem.data
+            })]);
+
+        var workItemIndex = this.db.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
+        
+        this.db.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
+        this.db.push(`/queues/${queue}/worked/${workItem.workId}`, 
+            {   received: workItem.received,
+                started: (new Date()).getTime(),
+                status: "in-progress"
+            });
+
+        this.workers[workerId].status = "working";
+        this.db.push(`/workers/${workerId}`, this.workers[workerId]);
+
     }
 
 }

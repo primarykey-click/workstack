@@ -131,4 +131,4 @@ dist
 
 
 *.code-workspace
-workerDb.json
+db.json
