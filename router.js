@@ -1,6 +1,7 @@
-const zmq = require("zeromq/v5-compat");
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
+const { Mutex } = require("async-mutex");
+const zmq = require("zeromq/v5-compat");
 
 
 module.exports = class Router
@@ -19,6 +20,7 @@ module.exports = class Router
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
         this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
+        this.mutex = new Mutex();
 
     }
 
@@ -39,7 +41,7 @@ module.exports = class Router
 
 
         this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`, 
-            function(err)
+            async function(err)
             {   
                 if(err)
                 {   throw(err);            
@@ -63,7 +65,7 @@ module.exports = class Router
                 }
                 
                 
-                _this.router.on("message", function()
+                _this.router.on("message", async function()
                 {   
                     var args = Array.apply(null, arguments);
                     var clientId = args[0].toString("utf8");
@@ -98,11 +100,12 @@ module.exports = class Router
                                 });
 
                             for(var workerId of Object.keys(_this.workers))
-                            {   var worker = _this.workers[workerId];
+                            {   
+                                var worker = _this.workers[workerId];
 
                                 if(worker.status == "ready")
                                 {   
-                                    _this.startWork(workerId, message.queue);
+                                    await _this.startWork(workerId, message.queue);
 
                                     break;
 
@@ -120,72 +123,76 @@ module.exports = class Router
 
                             _this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
                                 {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
-                            //_this.db.push(`/queues/${message.queue}/${message.workId}`, {completed: (new Date()).getTime(), status: "complete"});
 
                         break;
 
                     }
 
-                    //console.log(`Got message from ${args[0].toString("utf8")}`);
-                    //console.log(`Sending ${args[1].toString("utf8")}`);
-                    //router.send(["worker", "", args[1].toString("utf8")]);
                 })
 
             });        
     }
 
 
-    startWork(workerId, queue)
-    {   var workItem = null;
-
-        console.log(queue);
-
-                                    
-        try
-        {   
-            workItem = this.db.getData(`/queues/${queue}/not-started[-1]`);
-
-        }
-        catch(err)
-        {   
-            console.log(err);
-            //console.log(`No work items`);
-        
-            return;
-
-        }
+    async startWork(workerId, queue)
+    {   
+        var _this = this;
 
 
-        if(!workItem)
-        {
-            console.log(`No work items found: ${JSON.stringify(workItems)}`);
+        await this.mutex.runExclusive(async function()
+            {
+                var workItem = null;
 
-            return;
+                console.log(queue);
 
-        }
+                                            
+                try
+                {   
+                    workItem = _this.db.getData(`/queues/${queue}/not-started[-1]`);
+
+                }
+                catch(err)
+                {   
+                    console.log(err);
+                    //console.log(`No work items`);
+                
+                    return;
+
+                }
 
 
-        console.log("Work item: ", JSON.stringify(workItem));
-        console.log(`Assinging work ${workItem.id} to ${workerId}`);
-        
-        this.router.send([workerId, "", JSON.stringify(
-            {   command: "execWork",
-                queue: queue,
-                workId: workItem.workId,
-                data: workItem.data
-            })]);
+                if(!workItem)
+                {
+                    console.log(`No work items found: ${JSON.stringify(workItems)}`);
 
-        var workItemIndex = this.db.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
-        
-        this.db.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
-        this.db.push(`/queues/${queue}/worked/${workItem.workId}`, 
-            {   received: workItem.received,
-                started: (new Date()).getTime(),
-                status: "in-progress"
+                    return;
+
+                }
+
+
+                console.log("Work item: ", JSON.stringify(workItem));
+                console.log(`Assinging work ${workItem.id} to ${workerId}`);
+                
+                _this.router.send([workerId, "", JSON.stringify(
+                    {   command: "execWork",
+                        queue: queue,
+                        workId: workItem.workId,
+                        data: workItem.data
+                    })]);
+
+                var workItemIndex = _this.db.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
+                
+                _this.db.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
+                _this.db.push(`/queues/${queue}/worked/${workItem.workId}`, 
+                    {   received: workItem.received,
+                        started: (new Date()).getTime(),
+                        status: "in-progress"
+                    });
+
+                    _this.workers[workerId].status = "working";
+                    _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
+
             });
-
-        this.workers[workerId].status = "working";
-        this.db.push(`/workers/${workerId}`, this.workers[workerId]);
 
     }
 

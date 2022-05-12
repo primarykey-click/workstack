@@ -1,5 +1,5 @@
+const { uuidEmit } = require('uuid-timestamp')
 const zmq = require("zeromq/v5-compat");
-const uuid = require("uuid").v4;
 
 
 module.exports = class Producer
@@ -12,44 +12,27 @@ module.exports = class Producer
     constructor(args)
     {
         this.producer = zmq.socket("dealer");
-        this.producer.identity = `producer-${uuid()}`;
-        this.routerAddress = args.routerAddress ? args.routerAddress : "127.0.0.1";
-        this.routerPort = args.routerPort ? args.routerPort : 5001;
+        this.producer.identity = `producer-${uuidEmit()}`;
+        this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
+        this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
 
     }
 
 
     enqueue(message)
     {   
-        var modifiedMessage = message;
+        var modifiedMessage = JSON.parse(message);
 
         if(!modifiedMessage.id)
-        {   modifiedMessage = uuid();            
+        {   modifiedMessage.id = uuidEmit();            
         }
 
         this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
-        console.log(`Sending message ${modifiedMessage}`);
+        console.log(`Sending message ${JSON.stringify(modifiedMessage)}`);
         
-        this.producer.send([modifiedMessage]);
+        this.producer.send([JSON.stringify(modifiedMessage)]);
         this.producer.close();
 
     }
 
 }
-
-
-/*(   
-    async()=>
-    {   
-        var producer = zmq.socket("dealer");
-
-        producer.identity = `producer`;
-        producer.connect("tcp://127.0.0.1:5001")
-        console.log(`Sending message ${process.argv[2]}`);
-        console.log(JSON.parse(process.argv[2]));
-        producer.send([process.argv[2]]);
-        producer.close();
-
-    }
-
-)()*/

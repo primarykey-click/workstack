@@ -1,5 +1,5 @@
 const { Mutex } = require("async-mutex");
-const uuid = require("uuid").v4;
+const { uuidEmit } = require('uuid-timestamp')
 const zmq = require("zeromq/v5-compat");
 
 
@@ -17,11 +17,11 @@ module.exports = class Worker
     constructor(args)
     {
         this.worker = zmq.socket("dealer");
-        this.routerAddress = args.routerAddress ? args.routerAddress : "127.0.0.1";
-        this.routerPort = args.routerPort ? args.routerPort : 5001;
-        this.pingInterval = args.pingInterval ? args.pingInterval : 30000;
+        this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
+        this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
+        this.pingInterval = args.pingInterval ? args.pingInterval : this.pingInterval;
         this.queue = args.queue;
-        this.worker.identity = `worker-${uuid()}`;
+        this.worker.identity = `worker-${uuidEmit()}`;
         this.worker.work = args.work;
         this.mutex = new Mutex();
         
