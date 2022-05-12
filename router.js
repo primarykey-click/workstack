@@ -196,5 +196,33 @@ module.exports = class Router
 
     }
 
+
+    getQueued(queue)
+    {
+        return this.db.getData(`/queues/${queue}`);
+
+    }
+
+
+    getWorkStatus(queue, workId)
+    {
+        return this.db.getData(`/queues/${queue}/${workId}`);
+
+    }
+
+
+    getWorkers()
+    {
+        return this.workers;
+
+    }
+
+
+    getWorker(workerId)
+    {
+        return this.workers[workerId];
+
+    }
+
 }
         
