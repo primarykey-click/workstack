@@ -4,6 +4,11 @@ A massively scalable work queue implemented in Node.js **(currently in alpha sta
 
 ## Example Usage
 
+### Install
+```
+npm install workstack
+```
+
 ### Start a Router
 ```
 const { Router } = require("workstack");
