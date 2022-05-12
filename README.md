@@ -4,7 +4,7 @@ A massively scalable work queue implemented in Node.js
 
 ## Example Usage
 
-`
+```
 const { Worker } = require("../../workstack");
 
 
@@ -37,5 +37,5 @@ async function work(data)
     }
 )()
 
-`
+```
 
