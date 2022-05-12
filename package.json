@@ -1,5 +1,5 @@
 {
-  "name": "zmq-test",
+  "name": "workstack",
   "version": "1.0.0",
   "description": "",
   "main": "workstack.js",

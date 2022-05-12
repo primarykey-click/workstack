@@ -6,7 +6,7 @@ A massively scalable work queue implemented in Node.js **(currently in alpha sta
 
 ### Start a Router
 ```
-const { Router } = require("../workstack");
+const { Router } = require("workstack");
 
 var router = new Router({});
 router.start();
@@ -14,7 +14,7 @@ router.start();
 
 ### Start a Worker
 ```
-const { Worker } = require("../workstack");
+const { Worker } = require("workstack");
 
 async function work(data)
 {   
@@ -41,7 +41,7 @@ async function work(data)
 
 ### Send Work
 ```
-const { Producer } = require("../workstack");
+const { Producer } = require("workstack");
 
 var producer = new Producer({});
 producer.enqueue(
