@@ -15,7 +15,7 @@ module.exports = class Worker
         this.routerAddress = args.routerAddress ? args.routerAddress : "127.0.0.1";
         this.routerPort = args.routerPort ? args.routerPort : 5001;
         this.worker.identity = `worker-${uuid()}`;
-        this.worker.work = this.work;
+        this.worker.work = args.work;
         
     }
 
@@ -32,31 +32,24 @@ module.exports = class Worker
         this.worker.on("message", async function()
             {   
                 var args = Array.apply(null, arguments);
-                var workload = args[1].toString("utf8");
+                var message = JSON.parse(args[1].toString("utf8"));
+
+
+                switch(message.command)
+                {
+                    case "execWork":
+                        
+                        var output = await _this.worker.work(message.data);
+                        _this.worker.send([JSON.stringify({command: "workComplete", output: output})]);
+
+                    break;
+
+                }
+                //console.log(`Workload: ${JSON.stringify(message)}`);
 
                 //console.log("Workload", workload);
-                var workOutput = await _this.worker.work(workload);
-                _this.worker.send([JSON.stringify({command: "workComplete", workOutput: workOutput})]);
+                //var workOutput = await _this.worker.work(message);
 
-            });
-
-    }
-
-
-    async work(workload)
-    {   console.log(`${new Date()}: working.`);
-        console.log("Workload: ", workload);
-        await this._sleep(5000);
-        console.log(`${new Date()}: done.`);
-        
-        return {output: (new Date()).toString()}
-    }
-
-
-    _sleep(ms)
-    {
-        return new Promise((resolve) => 
-            {   setTimeout(resolve, ms);
             });
 
     }

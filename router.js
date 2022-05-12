@@ -58,8 +58,9 @@ module.exports = class Router
                             //console.log(`Workers: ${JSON.stringify(workers)}`);
 
                         break;
+                        
 
-                        case "executeWork":
+                        case "execWork":
                             
                             _this.db.push(`/${message.queue}/${message.id}`, {start: (new Date()).getTime(), status: "in-progress"});
 
@@ -67,9 +68,15 @@ module.exports = class Router
                             {   var worker = _this.workers[workerId];
 
                                 if(worker.ready)
-                                {   worker.ready = false;
-                                    _this.router.send([workerId, "", message.job]);
-                                    break;                            
+                                {   
+                                    worker.ready = false;
+                                    _this.router.send([workerId, "", JSON.stringify(
+                                        {   command: "execWork",
+                                            data: message.data
+                                        })]);
+
+                                    break;
+
                                 }
 
                             }
@@ -79,7 +86,7 @@ module.exports = class Router
 
                         case "workComplete":
                             
-                            console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.workOutput)}`);
+                            console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.output)}`);
                             _this.workers[clientId].ready = true;
 
                         break;
