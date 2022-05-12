@@ -28,7 +28,7 @@ async function work(data)
 
 (   async()=>
     {   
-        var worker = new Worker({pingInterval: 5000, queue: "test-queue", work: ()=>{console.log("test")}});
+        var worker = new Worker({pingInterval: 5000, queue: "test-queue", work: ()=>{console.log("doing work")}});
         worker.start();
 
     }
@@ -58,7 +58,7 @@ var router = new Router({authMethod: "sharedKey", authKey: "Quoh4tho3deebih{ei2o
 #### Worker
 ```
 var worker = new Worker({authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho", 
-    pingInterval: 30000, queue: "test-queue", work: ()=>{console.log("test")}});
+    pingInterval: 30000, queue: "test-queue", work: ()=>{console.log("doing work")}});
 ```
 
 #### Producer
