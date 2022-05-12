@@ -52,16 +52,16 @@ Currently shared key authentication is available.  To enable this please start t
 
 #### Router
 ```
-var router = new Router({authMethod: "sharedKey", authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho"});
+var router = new Router({authMethod: "sharedKey", authKey: "aequooLohkoa3ar2phee4sheeToxo6"});
 ```
 
 #### Worker
 ```
-var worker = new Worker({authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho", 
+var worker = new Worker({authKey: "aequooLohkoa3ar2phee4sheeToxo6", 
     pingInterval: 30000, queue: "test-queue", work: ()=>{console.log("doing work")}});
 ```
 
 #### Producer
 ```
-var producer = new Producer({authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho"});
+var producer = new Producer({authKey: "aequooLohkoa3ar2phee4sheeToxo6"});
 ```
