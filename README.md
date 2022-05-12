@@ -37,6 +37,7 @@ async function work(data)
 
 ### Send Work
 ```
+const uuid = require("uuid").v4;
 const { Producer } = require("../workstack");
 
 var producer = new Producer({});
