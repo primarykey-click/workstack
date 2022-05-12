@@ -44,11 +44,11 @@ async function work(data)
 const { Producer } = require("../workstack");
 
 var producer = new Producer({});
-producer.enqueue(JSON.stringify(
+producer.enqueue(
     {   queue: "test-queue",
         command: "execWork", 
         data: {vals: ["1", "2"]}
-    }));
+    });
 ```
 
 ### Authentication

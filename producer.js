@@ -23,7 +23,7 @@ module.exports = class Producer
 
     enqueue(message)
     {   
-        var modifiedMessage = JSON.parse(message);
+        var modifiedMessage = message;
 
         if(!modifiedMessage.id)
         {   
@@ -34,7 +34,7 @@ module.exports = class Producer
         if(this.authKey)
         {   modifiedMessage.authKey = this.authKey;
         }
-        
+
 
         this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
         console.log(`Sending message ${JSON.stringify(modifiedMessage)}`);
