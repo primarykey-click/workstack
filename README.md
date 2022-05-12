@@ -6,14 +6,11 @@ A massively scalable work queue implemented in Node.js **(work in progress - not
 
 ### Start a Router
 ```
-
 const { Router } = require("../workstack");
 
 var router = new Router({});
 router.start();
-
 ```
-
 
 ### Start a Worker
 ```
@@ -36,7 +33,6 @@ async function work(data)
 
     }
 )()
-
 ```
 
 ### Send Work
