@@ -57,7 +57,8 @@ var router = new Router({authMethod: "sharedKey", authKey: "Quoh4tho3deebih{ei2o
 
 #### Worker
 ```
-var worker = new Worker({authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho", pingInterval: 30000, queue: "test-queue", work: work});
+var worker = new Worker({authKey: "Quoh4tho3deebih{ei2ohpie8ok{eiceho", 
+    pingInterval: 30000, queue: "test-queue", work: work});
 ```
 
 #### Producer
