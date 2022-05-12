@@ -4,9 +4,20 @@ A massively scalable work queue implemented in Node.js **(work in progress - not
 
 ## Example Usage
 
+### Start a Router
+```
+
+const { Router } = require("../workstack");
+
+var router = new Router({});
+router.start();
+
+```
+
+
+### Start a Worker
 ```
 const { Worker } = require("../workstack");
-
 
 async function work(data)
 {   
@@ -18,7 +29,6 @@ async function work(data)
 
 }
 
-
 (   async()=>
     {   
         var worker = new Worker({work: work});
@@ -29,3 +39,17 @@ async function work(data)
 
 ```
 
+### Send Work
+```
+const uuid = require("uuid").v4;
+const { Producer } = require("../workstack");
+
+var producer = new Producer({});
+producer.enqueue(JSON.stringify(
+    {   queue: "test-queue",
+        id: uuid(),
+        command: "execWork", 
+        data: {vals: ["1", "2"]}
+    }));
+
+```
