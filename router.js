@@ -113,13 +113,6 @@ module.exports = class Router
 
                 case "execWork":
                     
-                    this.db.push(`/queues/${message.queue}/not-started[]`, 
-                        {   received: (new Date()).getTime(),
-                            workId: message.id,
-                            data: message.data,
-                            producerId: clientId
-                        });
-
                     for(var workerId of Object.keys(this.workers))
                     {   
                         var worker = this.workers[workerId];
@@ -133,6 +126,16 @@ module.exports = class Router
                         }
 
                     }
+
+                    this.db.push(`/queues/${message.queue}/not-started[]`, 
+                        {   received: (new Date()).getTime(),
+                            workId: message.id,
+                            data: message.data,
+                            producerId: clientId,
+                            workerId: workerId
+                        });
+
+                    
 
                 break;
 
