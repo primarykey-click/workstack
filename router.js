@@ -1,14 +1,17 @@
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 const { Mutex } = require("async-mutex");
-const zmq = require("zeromq/v5-compat");
+//const zmq = require("zeromq/v5-compat");
+const zmq = require("zeromq");
 
 
 module.exports = class Router
 {
     workers = {};
     router = null;
-    listenPort = 5001;
+    replyRouter = null;
+    listenPort = 5000;
+    replyListenPort = 5002;
     listenInterface = "*";
     dbFile = "db.json";
     db = null;
@@ -17,9 +20,12 @@ module.exports = class Router
 
 
     constructor(args)
-    {   this.router = zmq.socket("router");
+    {   //this.router = zmq.socket("router");
+        this.router = new zmq.Router();
+        //this.replyRouter = zmq.socket("rep");
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
+        this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
         this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
@@ -29,9 +35,8 @@ module.exports = class Router
     }
 
 
-    start()
+    async start()
     {   
-        var _this = this;
         this.db = new JsonDB(new JsonDbConfig(this.dbFile, true, true, "/"));
 
         try
@@ -44,7 +49,113 @@ module.exports = class Router
         }
 
 
-        this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`, 
+        await this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`);
+
+        console.log(`Listening on ${this.listenInterface}:${this.listenPort}`);
+
+
+        for(var workerId of Object.keys(this.workers))
+        {   
+            this.workers[workerId].status = "pending";
+            this.db.push(`/workers/${workerId}`, this.workers[workerId]);
+            
+            console.log(`Sending confirmReady command to ${workerId}`);
+
+            this.router.send([workerId, "", JSON.stringify(
+                {   command: "confirmReady"
+                })]);
+
+        }
+
+
+        for await (var [id, msg] of this.router)
+        {   var clientId = id.toString("utf8");
+            var message = JSON.parse(msg.toString("utf8"));
+
+            
+            switch(this.authMethod)
+            {   
+                case "sharedKey":
+
+                    if(message.authKey !== this.authKey)
+                    {   
+                        console.log(`Unauthorized or absent auth key: ignoring message ${JSON.stringify(message)}.`);
+
+                        return;
+
+                    }
+
+                break;
+
+            }
+
+            console.log(`Received message ${JSON.stringify(message)} from client ${clientId}`);
+
+            
+            switch(message.command)
+            {   
+                case "ready":
+                    
+                    if(!this.workers[clientId])
+                    {   this.workers[clientId] = {};
+                    }
+
+                    this.workers[clientId].status = "ready";
+                    this.workers[clientId].lastActivity = (new Date()).getTime();
+
+                    this.db.push(`/workers/${clientId}`, this.workers[clientId]);
+
+                    this.startWork(clientId, message.queue);
+                    
+
+                break;
+
+
+                case "execWork":
+                    
+                    this.db.push(`/queues/${message.queue}/not-started[]`, 
+                        {   received: (new Date()).getTime(),
+                            workId: message.id,
+                            data: message.data,
+                            producerId: clientId
+                        });
+
+                    for(var workerId of Object.keys(this.workers))
+                    {   
+                        var worker = this.workers[workerId];
+
+                        if(worker.status == "ready")
+                        {   
+                            this.startWork(workerId, message.queue);
+
+                            break;
+
+                        }
+
+                    }
+
+                break;
+
+
+                case "workComplete":
+                    
+                    console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.output)}`);
+                    this.workers[clientId].status = "ready";
+
+                    this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
+                        {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
+
+                    console.log(`Sending message ${JSON.stringify(message)} to ${message.producerId}`);
+                    this.router.send([message.producerId, {output: message.output}]);
+
+                break;
+
+            }
+
+        }
+
+
+        /*this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`, 
             async function(err)
             {   
                 if(err)
@@ -119,7 +230,8 @@ module.exports = class Router
                             _this.db.push(`/queues/${message.queue}/not-started[]`, 
                                 {   received: (new Date()).getTime(),
                                     workId: message.id,
-                                    data: message.data
+                                    data: message.data,
+                                    producerId: clientId
                                 });
 
                             for(var workerId of Object.keys(_this.workers))
@@ -147,13 +259,58 @@ module.exports = class Router
                             _this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
                                 {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
 
+                            _this.replyRouter.send([message.producerId, "", JSON.stringify(
+                                {   command: "workComplete",
+                                    queue: message.queue,
+                                    workId: message.workId,
+                                    output: message.output
+                                })]);
+
                         break;
 
                     }
 
                 })
 
-            });        
+            });*/
+            
+            
+        //_this.replyRouter.bind(`tcp://${this.listenInterface}:${this.replyListenPort}`,
+        //    async function()
+        //    {   
+                /*_this.replyRouter.on("message", 
+                    async function(msg)
+                    {   
+                        //var args = Array.apply(null, arguments);
+                        //var clientId = args[0].toString("utf8");
+                        //var message = JSON.parse(args[1].toString("utf8"));
+                        var message = JSON.parse(msg.toString("utf8"));
+    
+                        
+                        switch(_this.authMethod)
+                        {   
+                            case "sharedKey":
+    
+                                if(message.authKey !== _this.authKey)
+                                {   
+                                    console.log(`Unauthorized or absent auth key: ignoring message ${JSON.stringify(message)}.`);
+    
+                                    return;
+    
+                                }
+    
+                            break;
+    
+                        }
+
+                        console.log("sending reply");
+
+                        _this.replyRouter.send("test");
+                        
+                    })*/
+
+            //})
+        
     }
 
 
@@ -192,7 +349,7 @@ module.exports = class Router
 
                 if(!workItem)
                 {
-                    console.log(`No work items found: ${JSON.stringify(workItems)}`);
+                    console.log(`No work items found`);
 
                     return;
 
@@ -200,13 +357,14 @@ module.exports = class Router
 
 
                 console.log("Work item: ", JSON.stringify(workItem));
-                console.log(`Assinging work ${workItem.id} to ${workerId}`);
+                console.log(`Assinging work ${workItem.workId} to ${workerId}`);
                 
                 _this.router.send([workerId, "", JSON.stringify(
                     {   command: "execWork",
                         queue: queue,
                         workId: workItem.workId,
-                        data: workItem.data
+                        data: workItem.data,
+                        producerId: workItem.producerId
                     })]);
 
                 var workItemIndex = _this.db.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
@@ -215,11 +373,13 @@ module.exports = class Router
                 _this.db.push(`/queues/${queue}/worked/${workItem.workId}`, 
                     {   received: workItem.received,
                         started: (new Date()).getTime(),
-                        status: "in-progress"
+                        status: "in-progress",
+                        producerId: workItem.producerId,
+                        data: workItem.data
                     });
 
-                    _this.workers[workerId].status = "working";
-                    _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
+                _this.workers[workerId].status = "working";
+                _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
 
             });
 

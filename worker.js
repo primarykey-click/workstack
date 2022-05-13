@@ -1,5 +1,5 @@
 const { Mutex } = require("async-mutex");
-const { uuidEmit } = require('uuid-timestamp')
+const { uuidEmit } = require("uuid-timestamp")
 const zmq = require("zeromq/v5-compat");
 
 
@@ -7,7 +7,7 @@ module.exports = class Worker
 {   
     worker = null;
     routerAddress = "127.0.0.1";
-    routerPort = 5001;
+    routerPort = 5000;
     pingInterval = 30000;
     queue = null;
     mutex = null;
@@ -44,11 +44,11 @@ module.exports = class Worker
         this.pingRouter();
 
         
-        this.worker.on("message", async function()
-            {   var args = Array.apply(null, arguments);
-                var message = JSON.parse(args[1].toString("utf8"));
+        this.worker.on("message", async function(id, msg)
+            {   //var args = Array.apply(null, arguments);
+                var message = JSON.parse(msg.toString("utf8"));
 
-                console.log(`Received message ${JSON.stringify(JSON.parse(args[1].toString("utf8")))}`);
+                console.log(`Received message ${JSON.stringify(JSON.parse(msg.toString("utf8")))}`);
 
 
                 switch(message.command)
@@ -72,7 +72,8 @@ module.exports = class Worker
                                     {   command: "workComplete",
                                         queue: message.queue,
                                         workId: message.workId,
-                                        output: output
+                                        producerId: message.producerId,
+                                        output: JSON.stringify(output)
                                     });
                                 
                                 _this.status = "ready";

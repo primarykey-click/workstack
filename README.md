@@ -57,7 +57,7 @@ producer.enqueue(
 ```
 
 ### Authentication
-Currently shared key authentication is available.  To enable this please start the tiers (Router, Worker and Producer) with the following additional parameters:
+Currently shared key authentication is available.  To enable this, start the tiers (Router, Worker and Producer) with the following additional parameters:
 
 #### Router
 ```
