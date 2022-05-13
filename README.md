@@ -56,6 +56,18 @@ producer.enqueue(
     });
 ```
 
+### Send Work Synchronously (wait for reply)
+```
+const { Producer } = require("workstack");
+
+var producer = new Producer({});
+producer.enqueue(
+    {   queue: "test-queue",
+        command: "execWork", 
+        data: {vals: ["1", "2"]}
+    }, true);
+```
+
 ### Authentication
 Currently shared key authentication is available.  To enable this, start the tiers (Router, Worker and Producer) with the following additional parameters:
 
