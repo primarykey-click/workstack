@@ -61,11 +61,20 @@ producer.enqueue(
 const { Producer } = require("workstack");
 
 var producer = new Producer({});
-producer.enqueue(
-    {   queue: "test-queue",
-        command: "execWork", 
-        data: {vals: ["1", "2"]}
-    }, true);
+(   
+    async()=>
+    {   
+        var output = await producer.enqueue(
+        {   queue: "test-queue",
+            command: "execWork", 
+            data: {vals: ["1", "2"]}
+        }, true);
+
+        console.log(JSON.stringify(output));
+
+    }
+
+)()
 ```
 
 ### Authentication

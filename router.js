@@ -9,9 +9,7 @@ module.exports = class Router
 {
     workers = {};
     router = null;
-    replyRouter = null;
     listenPort = 5000;
-    replyListenPort = 5002;
     listenInterface = "*";
     dbFile = "db.json";
     db = null;
@@ -20,9 +18,7 @@ module.exports = class Router
 
 
     constructor(args)
-    {   //this.router = zmq.socket("router");
-        this.router = new zmq.Router();
-        //this.replyRouter = zmq.socket("rep");
+    {   this.router = new zmq.Router();
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
