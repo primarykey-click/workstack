@@ -18,6 +18,7 @@ module.exports = class Router
     db = null;
     authMethod = "none";
     authKey = "auth.key";
+    lastWorkerIndex = 0;
 
 
     constructor(args)
@@ -131,13 +132,30 @@ module.exports = class Router
                         {   received: (new Date()).getTime(),
                             workId: message.id,
                             data: message.data,
-                            producerId: clientId,
-                            workerId: workerId
+                            producerId: clientId
                         });
                     this.db.save();
 
+                    var readyWorkerId = await this.reserveReadyWorker(message);
+
+                    if(readyWorkerId)
+                    {   
+                        this.workPendingStart[message.id] = 
+                        {   workerId: readyWorkerId,
+                            pendingSince: (new Date()).getTime()
+                        }
+
+                        this.startWork(readyWorkerId, message.queue);
+
+                    }
+                    else
+                    {   console.log("Ready worker ID: ", readyWorkerId);
+                        console.log(`[${new Date()}] No workers ready: queueing message ${message.id}`);
+
+                    }
+
                     
-                    for(var workerId of Object.keys(this.workers))
+                    /*for(var workerId of Object.keys(this.workers))
                     {   
                         var worker = this.workers[workerId];
 
@@ -154,7 +172,7 @@ module.exports = class Router
 
                         }
 
-                    }
+                    }*/
 
                     
 
@@ -170,7 +188,7 @@ module.exports = class Router
                         {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
                     this.db.save();
 
-                    console.log(`Sending message ${JSON.stringify(message)} to ${message.producerId}`);
+                    console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
                     this.router.send([message.producerId, {output: message.output}]);
 
                 break;
@@ -179,6 +197,76 @@ module.exports = class Router
 
         }
         
+    }
+
+
+    async reserveReadyWorker(message)
+    {   
+        var _this = this;
+        var readyWorkerId = null;
+
+
+        await this.mutex.runExclusive(async function()
+            {   
+                var workerIds = Object.keys(_this.workers);
+                var nextWorkerIndex = _this.lastWorkerIndex + 1;
+                var timesWrapped = 0;
+
+                if(workerIds.length == 0)
+                {   
+                    console.log(`No workers online`);
+                
+                    return null;
+
+                }
+
+
+                while(true)
+                {   
+                    if(nextWorkerIndex >= workerIds.length)
+                    {   nextWorkerIndex = 0;
+                        timesWrapped++;
+                    }
+
+                    //console.log(`Next worker index: ${nextWorkerIndex}, times wrapped: ${timesWrapped}`);
+                    var nextWorkerId = workerIds[nextWorkerIndex];
+
+                    var worker = _this.workers[nextWorkerId];
+
+                    if(worker.status == "ready")
+                    {   
+                        console.log(`Reserving worker ${nextWorkerId}`);
+
+                        _this.lastWorkerIndex = nextWorkerIndex;
+                        readyWorkerId =  nextWorkerId;
+
+                        _this.workers[readyWorkerId].status = "working";
+                        _this.db.push(`/workers/${readyWorkerId}`, _this.workers[readyWorkerId]);
+                        _this.db.save();
+
+                        return;
+
+                    }
+                    else
+                    {   
+                        console.log(`Worker ${worker.id} not ready.  Worker: ${JSON.stringify(worker)}`);
+                        nextWorkerIndex++;
+
+                        if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
+                        {
+                            return null;
+
+                        }
+
+                    }
+
+                }
+
+            });
+
+        
+        return readyWorkerId;
+
     }
 
 
@@ -242,13 +330,10 @@ module.exports = class Router
                     {   received: workItem.received,
                         started: (new Date()).getTime(),
                         status: "in-progress",
+                        workerId: workerId,
                         producerId: workItem.producerId,
                         data: workItem.data
                     });
-
-                _this.workers[workerId].status = "working";
-                _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
-                _this.db.save();
 
             });
 
