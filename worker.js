@@ -54,13 +54,6 @@ module.exports = class Worker
 
                 switch(message.command)
                 {
-                    /*case "confirmReady":
-                        
-                        _this.sendMessage({command: "ready", queue: _this.queue});
-
-                    break;*/
-
-
                     case "execWork":
                         
                         await _this.mutex.runExclusive(async function()
