@@ -128,7 +128,11 @@ module.exports = class Worker
         {   console.log(`Sending message ${JSON.stringify(message)}`);
         }
         else
-        {   console.log(`Sending message with ID ${message.id} and command "${message.command}"`);            
+        {   
+            if(message.command != "ready" || (message.command == "ready" && this.debug))
+            {   console.log(`Sending message with ID ${message.id} and command "${message.command}"`);            
+            }
+
         }
 
         this.worker.send([JSON.stringify(modifiedMessage)]);

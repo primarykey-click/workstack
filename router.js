@@ -94,7 +94,9 @@ module.exports = class Router
 
             }
 
-            console.log(`Received message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
+            if(message.command != "ready" || (message.command == "ready" && this.debug))
+            {   console.log(`Received message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
+            }
 
             
             switch(message.command)
@@ -199,7 +201,9 @@ module.exports = class Router
                 {   
                     if(err.message && err.message.match(/Can't find index -1/g))
                     {
-                        console.log(`No work items in queue ${queue}`);
+                        if(_this.debug)
+                        {   console.log(`No work items in queue ${queue}`);
+                        }
 
                     }
                     else
