@@ -9,6 +9,7 @@ module.exports = class Worker
     routerAddress = "127.0.0.1";
     routerPort = 5000;
     pingInterval = 30000;
+    debug = false;
     queue = null;
     mutex = null;
     status = null;
@@ -21,6 +22,7 @@ module.exports = class Worker
         this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
         this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
         this.pingInterval = args.pingInterval ? args.pingInterval : this.pingInterval;
+        this.debug = args.debug ? args.debug : false;
         this.authKey = args.authKey ? args.authKey : this.authKey;
         this.queue = args.queue;
         this.worker.identity = `worker-${uuidEmit()}`;
@@ -38,26 +40,25 @@ module.exports = class Worker
 
         this.worker.connect(`tcp://${this.routerAddress}:${this.routerPort}`)
 
-        this.sendMessage({command: "ready", queue: this.queue});
-        this.status = "ready";
+        this.sendReady();
 
         this.pingRouter();
 
         
         this.worker.on("message", async function(id, msg)
-            {   //var args = Array.apply(null, arguments);
+            {   
                 var message = JSON.parse(msg.toString("utf8"));
 
-                console.log(`Received message ${JSON.stringify(JSON.parse(msg.toString("utf8")))}`);
+                console.log(`Received message with ID ${JSON.stringify(JSON.parse(msg.toString("utf8")).workId)} and command ${message.command}`);
 
 
                 switch(message.command)
                 {
-                    case "confirmReady":
+                    /*case "confirmReady":
                         
                         _this.sendMessage({command: "ready", queue: _this.queue});
 
-                    break;
+                    break;*/
 
 
                     case "execWork":
@@ -65,7 +66,7 @@ module.exports = class Worker
                         await _this.mutex.runExclusive(async function()
                             {   
                                 _this.status = "working";
-                                console.log(JSON.stringify(message));
+                                _this.sendMessage({command: "working", workId: message.workId});
                                 
                                 var output = await _this.worker.work(message.data);
                                 _this.sendMessage(
@@ -76,7 +77,7 @@ module.exports = class Worker
                                         output: JSON.stringify(output)
                                     });
                                 
-                                _this.status = "ready";
+                                _this.sendReady();
 
                             });
 
@@ -86,6 +87,19 @@ module.exports = class Worker
 
             });
 
+
+        process.on("SIGINT", function(){_this.exitClean();});
+        process.on("SIGTERM", function(){_this.exitClean();});
+
+    }
+
+
+    exitClean()
+    {   
+        this.sendMessage({command: "offline"});
+        this.worker.close();
+        process.exit();
+
     }
 
 
@@ -94,11 +108,12 @@ module.exports = class Worker
         var _this = this;
 
         setTimeout(async function()
-            {   await _this.mutex.runExclusive(function ()
-                    {   console.log(`Sending ready ${new Date()} at interval ${_this.pingInterval}`);
-                        _this.sendMessage({command: "ready", queue: _this.queue});
+            {   
+                await _this.mutex.runExclusive(function ()
+                    {   _this.sendReady();
                         _this.pingRouter();
-                    });           
+                    });
+
             }, this.pingInterval);
 
     }
@@ -112,10 +127,31 @@ module.exports = class Worker
         {   modifiedMessage.authKey = this.authKey;
         }
 
-        console.log(`Sending message ${JSON.stringify(message)}`);
+        if(!message.id)
+        {   message.id = uuidEmit();            
+        }
+
+        if(this.debug)
+        {   console.log(`Sending message ${JSON.stringify(message)}`);
+        }
+        else
+        {   console.log(`Sending message with ID ${message.id} and command "${message.command}"`);            
+        }
 
         this.worker.send([JSON.stringify(modifiedMessage)]);
 
-    }    
+    }
+
+
+    sendReady()
+    {   
+        if(this.debug)
+        {   console.log(`[${(new Date()).toString()}] Sending ready`);            
+        }
+
+        this.status = "ready";
+        this.sendMessage({command: "ready", queue: this.queue});
+
+    }
 
 }

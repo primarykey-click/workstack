@@ -1,6 +1,7 @@
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 const { Mutex } = require("async-mutex");
+const { uuidEmit } = require("uuid-timestamp")
 //const zmq = require("zeromq/v5-compat");
 const zmq = require("zeromq");
 
@@ -8,9 +9,11 @@ const zmq = require("zeromq");
 module.exports = class Router
 {
     workers = {};
+    workPendingStart = {};
     router = null;
     listenPort = 5000;
     listenInterface = "*";
+    debug = false;
     dbFile = "db.json";
     db = null;
     authMethod = "none";
@@ -23,6 +26,7 @@ module.exports = class Router
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
+        this.debug = args.debug ? args.debug : false;
         this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
         this.authKey = args.authKey ? args.authKey : this.authKey;
@@ -33,16 +37,16 @@ module.exports = class Router
 
     async start()
     {   
-        this.db = new JsonDB(new JsonDbConfig(this.dbFile, true, true, "/"));
+        this.db = new JsonDB(new JsonDbConfig(this.dbFile, false, true, "/"));
 
-        try
+        /*try
         {   this.workers = this.db.getData("/workers");
         }
         catch(err)
         {   
             console.log("No workers registered");
 
-        }
+        }*/
 
 
         await this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`);
@@ -50,22 +54,27 @@ module.exports = class Router
         console.log(`Listening on ${this.listenInterface}:${this.listenPort}`);
 
 
-        for(var workerId of Object.keys(this.workers))
+        /*for(var workerId of Object.keys(this.workers))
         {   
-            this.workers[workerId].status = "pending";
-            this.db.push(`/workers/${workerId}`, this.workers[workerId]);
+            delete this.workers[workerId];
+            this.db.delete(`/workers/${workerId}`);
             
             console.log(`Sending confirmReady command to ${workerId}`);
 
             this.router.send([workerId, "", JSON.stringify(
-                {   command: "confirmReady"
+                {   id: uuidEmit(),
+                    command: "confirmReady"
                 })]);
 
-        }
+        }*/
+
+
+        // Add background thread (setTimeout()) to check for workPendingStart items and put them back into the queue if passed the expiry threshold
 
 
         for await (var [id, msg] of this.router)
-        {   var clientId = id.toString("utf8");
+        {   
+            var clientId = id.toString("utf8");
             var message = JSON.parse(msg.toString("utf8"));
 
             
@@ -85,43 +94,36 @@ module.exports = class Router
 
             }
 
-            console.log(`Received message ${JSON.stringify(message)} from client ${clientId}`);
+            console.log(`Received message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
 
             
             switch(message.command)
             {   
+                case "working":
+                    
+                    delete this.workPendingStart[message.workId];
+
+                break;
+
+
                 case "ready":
                     
-                    if(!this.workers[clientId])
-                    {   this.workers[clientId] = {};
-                    }
+                    this.setWorkerReady(clientId, message);
 
-                    this.workers[clientId].status = "ready";
-                    this.workers[clientId].lastActivity = (new Date()).getTime();
+                break;
 
-                    this.db.push(`/workers/${clientId}`, this.workers[clientId]);
 
-                    this.startWork(clientId, message.queue);
+                case "offline":
+                    
+                    delete this.workers[clientId];
+                    this.db.delete(`/workers/${clientId}`);
+                    this.db.save();
                     
 
                 break;
 
 
                 case "execWork":
-                    
-                    for(var workerId of Object.keys(this.workers))
-                    {   
-                        var worker = this.workers[workerId];
-
-                        if(worker.status == "ready")
-                        {   
-                            this.startWork(workerId, message.queue);
-
-                            break;
-
-                        }
-
-                    }
 
                     this.db.push(`/queues/${message.queue}/not-started[]`, 
                         {   received: (new Date()).getTime(),
@@ -130,6 +132,27 @@ module.exports = class Router
                             producerId: clientId,
                             workerId: workerId
                         });
+                    this.db.save();
+
+                    
+                    for(var workerId of Object.keys(this.workers))
+                    {   
+                        var worker = this.workers[workerId];
+
+                        if(worker.status == "ready")
+                        {   
+                            this.workPendingStart[message.id] = 
+                            {   workerId: workerId,
+                                pendingSince: (new Date()).getTime()
+                            }
+
+                            this.startWork(workerId, message.queue);
+
+                            break;
+
+                        }
+
+                    }
 
                     
 
@@ -139,10 +162,11 @@ module.exports = class Router
                 case "workComplete":
                     
                     console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.output)}`);
-                    this.workers[clientId].status = "ready";
+                    //this.workers[clientId].status = "ready";
 
                     this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
                         {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
+                    this.db.save();
 
                     console.log(`Sending message ${JSON.stringify(message)} to ${message.producerId}`);
                     this.router.send([message.producerId, {output: message.output}]);
@@ -181,8 +205,7 @@ module.exports = class Router
                     else
                     {   console.log(err);                       
                     }
-                    //console.log(err.message);
-                    //console.log(`No work items`);
+
                 
                     return;
 
@@ -198,7 +221,6 @@ module.exports = class Router
                 }
 
 
-                console.log("Work item: ", JSON.stringify(workItem));
                 console.log(`Assinging work ${workItem.workId} to ${workerId}`);
                 
                 _this.router.send([workerId, "", JSON.stringify(
@@ -222,8 +244,29 @@ module.exports = class Router
 
                 _this.workers[workerId].status = "working";
                 _this.db.push(`/workers/${workerId}`, _this.workers[workerId]);
+                _this.db.save();
 
             });
+
+    }
+
+
+    setWorkerReady(clientId, message)
+    {   
+        if(this.debug)
+        {   console.log(`Setting worker status for ${clientId} to ready`);            
+        }
+
+        if(!this.workers[clientId])
+        {   this.workers[clientId] = {};
+        }
+
+        this.workers[clientId].status = "ready";
+        this.workers[clientId].lastActivity = (new Date()).getTime();
+
+        this.db.push(`/workers/${clientId}`, this.workers[clientId]);
+
+        this.startWork(clientId, message.queue);
 
     }
 

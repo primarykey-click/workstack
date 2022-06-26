@@ -35,7 +35,7 @@ module.exports = class Producer
 
         this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
         
-        console.log(`Sending message ${JSON.stringify(message)}`);
+        console.log(`Sending message with ID ${JSON.stringify(message.id)}`);
         await this.producer.send(JSON.stringify(message));
 
 
