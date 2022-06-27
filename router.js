@@ -455,7 +455,6 @@ module.exports = class Router
     {
         var response = await this.db.find({selector: {type: "workOutput", workId: workId}});
         var workResult = {};
-        console.log("Response: ", JSON.stringify(response));
 
         if(response.docs.length > 0)
         {   workResult = response.docs[0];
