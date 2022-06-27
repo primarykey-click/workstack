@@ -1,10 +1,13 @@
+const PouchDB = require("pouchdb-node");
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 const { Mutex } = require("async-mutex");
 const { uuidEmit } = require("uuid-timestamp")
 //const zmq = require("zeromq/v5-compat");
 const zmq = require("zeromq");
-const { fromString } = require("uuidv4");
+//const { socket } = require("zeromq/v5-compat");
+
+PouchDB.plugin(require("pouchdb-find"));
 
 
 module.exports = class Router
@@ -18,8 +21,10 @@ module.exports = class Router
     cleanupInterval = 60000;
     pendingWorkExpiry = 15000;
     debug = false;
-    dbFile = "db.json";
+    dbDir = "./data/db";
     db = null;
+    cacheFile = "./data/cache/db.json";
+    cache = null;
     authMethod = "none";
     authKey = "auth.key";
     lastWorkerIndex = 0;
@@ -27,15 +32,17 @@ module.exports = class Router
 
     constructor(args)
     {   this.router = new zmq.Router();
+        //this.events = this.router.events;
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
-        this.readyExpiry = args.readyExpiry ? args.readyExpiry : 30000;
-        this.cleanupInterval = args.cleanupInterval ? args.cleanupInterval : 60000;
-        this.pendingWorkExpiry = args.pendingWorkExpiry ? args.pendingWorkExpiry : 15000;
+        this.readyExpiry = args.readyExpiry ? args.readyExpiry : this.readyExpiry;
+        this.cleanupInterval = args.cleanupInterval ? args.cleanupInterval : this.cleanupInterval;
+        this.pendingWorkExpiry = args.pendingWorkExpiry ? args.pendingWorkExpiry : this.pendingWorkExpiry;
         this.debug = args.debug ? args.debug : false;
-        this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
+        this.cacheFile = args.cacheFile ? args.cacheFile : (args.dbFile ? args.dbFile : this.cacheFile);
+        this.dbDir = args.dbDir ? args.dbDir : this.dbDir;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
         this.authKey = args.authKey ? args.authKey : this.authKey;
         this.mutex = new Mutex();
@@ -43,15 +50,37 @@ module.exports = class Router
     }
 
 
+    /*async observe()
+    {
+        for await (var event of this.events)
+        {
+            console.log(`Event of type ${event.type} fired`);
+            console.log("Event:", JSON.stringify(event));
+
+        }
+        
+    }*/
+
+
     async start()
     {   
-        this.db = new JsonDB(new JsonDbConfig(this.dbFile, false, true, "/"));
+        this.cache = new JsonDB(new JsonDbConfig(this.cacheFile, false, true, "/"));
+        
+        this.db = new PouchDB(`${this.dbDir}/workstack`);
+        await this.db.createIndex({index: {fields: ["type", "workId"]}});
 
         await this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`);
         console.log(`Listening on ${this.listenInterface}:${this.listenPort}`);
 
 
         this.cleanup();
+
+
+        /*for await (var event of this.events)
+        {
+            console.log(`Event of type ${event.type} fired`);
+
+        }*/
 
 
         for await (var [id, msg] of this.router)
@@ -110,13 +139,13 @@ module.exports = class Router
 
                     var received = (new Date()).getTime();
 
-                    this.db.push(`/queues/${message.queue}/not-started[]`, 
+                    this.cache.push(`/queues/${message.queue}/not-started[]`, 
                         {   received: received,
                             workId: message.id,
                             data: message.data,
                             producerId: clientId
                         });
-                    this.db.save();
+                    this.cache.save();
 
                     var readyWorkerId = await this.reserveReadyWorker(message);
 
@@ -144,12 +173,24 @@ module.exports = class Router
                     
                     console.log(`Work for message ${message.id} completed by ${clientId}.`);
 
-                    this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
-                        {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
-                    this.db.save();
+                    //this.cache.push(`/queues/${message.queue}/worked/${message.workId}`,
+                    //    {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
+                    //this.cache.save();
+                    await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
+                    await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
 
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
-                    this.router.send([message.producerId, JSON.stringify({output: JSON.parse(message.output)})]);
+                    this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
+
+                break;
+
+
+                case "getWorkResult":
+
+                    var workResult = await this.getWorkResult(message.workId);
+
+                    console.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
+                    this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
 
                 break;
 
@@ -244,7 +285,7 @@ module.exports = class Router
                 
                 try
                 {   
-                    workItem = _this.db.getData(`/queues/${queue}/not-started[-1]`);
+                    workItem = _this.cache.getData(`/queues/${queue}/not-started[-1]`);
 
                 }
                 catch(err)
@@ -285,10 +326,10 @@ module.exports = class Router
                         producerId: workItem.producerId
                     })]);
 
-                var workItemIndex = _this.db.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
+                var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
                 
-                _this.db.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
-                _this.db.push(`/queues/${queue}/worked/${workItem.workId}`, 
+                _this.cache.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
+                _this.cache.push(`/queues/${queue}/worked/${workItem.workId}`, 
                     {   received: workItem.received,
                         started: (new Date()).getTime(),
                         status: "in-progress",
@@ -296,6 +337,7 @@ module.exports = class Router
                         producerId: workItem.producerId,
                         data: workItem.data
                     });
+                _this.cache.save();
 
             });
 
@@ -374,16 +416,16 @@ module.exports = class Router
                         
                         await _this.mutex.runExclusive(function ()
                             {   
-                                var workItem = _this.db.get(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                                var workItem = _this.cache.get(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
                                 
-                                _this.db.push(`/queues/${pendingWork.queue}/not-started[]`, 
+                                _this.cache.push(`/queues/${pendingWork.queue}/not-started[]`, 
                                     {   received: workItem.received,
                                         workId: pendingWork.workId,
                                         data: workItem.data,
                                         producerId: workItem.producerId
                                     });
 
-                                _this.db.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                                _this.cache.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
 
                                 delete _this.workers[pendingWork.queue][workerId];
                                 
@@ -404,14 +446,23 @@ module.exports = class Router
 
     getQueued(queue)
     {
-        return this.db.getData(`/queues/${queue}`);
+        return this.cache.getData(`/queues/${queue}`);
 
     }
 
 
-    getWorkStatus(queue, workId)
+    async getWorkResult(workId)
     {
-        return this.db.getData(`/queues/${queue}/${workId}`);
+        var response = await this.db.find({selector: {type: "workOutput", workId: workId}});
+        var workResult = {};
+        console.log("Response: ", JSON.stringify(response));
+
+        if(response.docs.length > 0)
+        {   workResult = response.docs[0];
+        }
+
+        
+        return workResult;
 
     }
 

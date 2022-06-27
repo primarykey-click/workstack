@@ -13,8 +13,6 @@ module.exports = class Producer
     constructor(args)
     {
         this.producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
-        //this.requestProducer = zmq.socket("req");
-        //this.producer.identity = ;
         this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
         this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
         this.authKey = args.authKey ? args.authKey : this.authKey;
