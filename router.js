@@ -14,6 +14,9 @@ module.exports = class Router
     router = null;
     listenPort = 5000;
     listenInterface = "*";
+    readyExpiry = 30000;
+    cleanupInterval = 60000;
+    pendingWorkExpiry = 15000;
     debug = false;
     dbFile = "db.json";
     db = null;
@@ -28,6 +31,9 @@ module.exports = class Router
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
+        this.readyExpiry = args.readyExpiry ? args.readyExpiry : 30000;
+        this.cleanupInterval = args.cleanupInterval ? args.cleanupInterval : 60000;
+        this.pendingWorkExpiry = args.pendingWorkExpiry ? args.pendingWorkExpiry : 15000;
         this.debug = args.debug ? args.debug : false;
         this.dbFile = args.dbFile ? args.dbFile : this.dbFile;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
@@ -45,7 +51,7 @@ module.exports = class Router
         console.log(`Listening on ${this.listenInterface}:${this.listenPort}`);
 
 
-        // Add background thread (setTimeout()) to check for workPendingStart items and put them back into the queue if passed the expiry threshold
+        this.cleanup();
 
 
         for await (var [id, msg] of this.router)
@@ -71,7 +77,7 @@ module.exports = class Router
             }
 
             if(message.command != "ready" || (message.command == "ready" && this.debug))
-            {   console.log(`Received message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
+            {   console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
             }
 
             
@@ -79,7 +85,7 @@ module.exports = class Router
             {   
                 case "working":
                     
-                    delete this.workPendingStart[message.workId];
+                    delete this.workPendingStart[clientId];
 
                 break;
 
@@ -102,8 +108,10 @@ module.exports = class Router
 
                 case "execWork":
 
+                    var received = (new Date()).getTime();
+
                     this.db.push(`/queues/${message.queue}/not-started[]`, 
-                        {   received: (new Date()).getTime(),
+                        {   received: received,
                             workId: message.id,
                             data: message.data,
                             producerId: clientId
@@ -114,8 +122,9 @@ module.exports = class Router
 
                     if(readyWorkerId)
                     {   
-                        this.workPendingStart[message.id] = 
-                        {   workerId: readyWorkerId,
+                        this.workPendingStart[readyWorkerId] = 
+                        {   queue: message.queue,
+                            workId: message.id,
                             pendingSince: (new Date()).getTime()
                         }
 
@@ -311,6 +320,84 @@ module.exports = class Router
         this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
 
         this.startWork(clientId, message.queue);
+
+    }
+
+
+    cleanup()
+    {   
+        var _this = this;
+
+        
+        if(this.debug)
+        {   console.log(`[${(new Date()).getTime()}] Cleaning up`);
+        }
+
+        
+        setTimeout(async function()
+            {   
+                /* Purge expired workers */
+
+                await _this.mutex.runExclusive(function ()
+                    {   
+                        for(var queue of Object.keys(_this.workers))
+                        {   
+                            for(var workerId of Object.keys(_this.workers[queue]))
+                            {   
+                                var lastActivity = _this.workers[queue][workerId].lastActivity;
+                                var now = (new Date()).getTime();
+                                
+                                if(now - lastActivity >= _this.readyExpiry)
+                                {   
+                                    console.log(`Purging expired worker ${workerId}`);
+                                    delete _this.workers[queue][workerId];
+
+                                }
+
+                            }
+
+                        }
+
+                    });
+
+                
+                /* Re-queue orphaned work */
+        
+                for(var workerId of Object.keys(_this.workPendingStart))
+                {
+                    var pendingWork = _this.workPendingStart[workerId];
+                    var now = (new Date()).getTime();
+
+                    if(now - pendingWork.pendingSince >= _this.pendingWorkExpiry)
+                    {   
+                        console.log(`Requeuing orphaned work item with ID ${pendingWork.workId} pending since ${(new Date(pendingWork.pendingSince)).toString()}`);
+                        
+                        await _this.mutex.runExclusive(function ()
+                            {   
+                                var workItem = _this.db.get(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                                
+                                _this.db.push(`/queues/${pendingWork.queue}/not-started[]`, 
+                                    {   received: workItem.received,
+                                        workId: pendingWork.workId,
+                                        data: workItem.data,
+                                        producerId: workItem.producerId
+                                    });
+
+                                _this.db.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+
+                                delete _this.workers[pendingWork.queue][workerId];
+                                
+
+                            });
+
+                    }
+
+
+                }
+
+                _this.cleanup();
+
+            }, _this.cleanupInterval);
 
     }
 

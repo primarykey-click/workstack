@@ -25,7 +25,7 @@ module.exports = class Worker
         this.debug = args.debug ? args.debug : false;
         this.authKey = args.authKey ? args.authKey : this.authKey;
         this.queue = args.queue;
-        this.worker.identity = `worker-${uuidEmit()}`;
+        this.worker.identity = `worker-${args.workerId ? args.workerId : uuidEmit()}`;
         this.worker.work = args.work;
         this.mutex = new Mutex();
         
@@ -59,7 +59,7 @@ module.exports = class Worker
                         await _this.mutex.runExclusive(async function()
                             {   
                                 _this.status = "working";
-                                _this.sendMessage({command: "working", workId: message.workId});
+                                _this.sendMessage({command: "working"});
                                 
                                 var output = await _this.worker.work(message.data);
                                 _this.sendMessage(
@@ -104,8 +104,9 @@ module.exports = class Worker
             {   
                 await _this.mutex.runExclusive(function ()
                     {   _this.sendReady();
-                        _this.pingRouter();
                     });
+                
+                _this.pingRouter();
 
             }, this.pingInterval);
 
