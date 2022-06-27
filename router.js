@@ -4,6 +4,7 @@ const { Mutex } = require("async-mutex");
 const { uuidEmit } = require("uuid-timestamp")
 //const zmq = require("zeromq/v5-compat");
 const zmq = require("zeromq");
+const { fromString } = require("uuidv4");
 
 
 module.exports = class Router
@@ -40,34 +41,8 @@ module.exports = class Router
     {   
         this.db = new JsonDB(new JsonDbConfig(this.dbFile, false, true, "/"));
 
-        /*try
-        {   this.workers = this.db.getData("/workers");
-        }
-        catch(err)
-        {   
-            console.log("No workers registered");
-
-        }*/
-
-
         await this.router.bind(`tcp://${this.listenInterface}:${this.listenPort}`);
-
         console.log(`Listening on ${this.listenInterface}:${this.listenPort}`);
-
-
-        /*for(var workerId of Object.keys(this.workers))
-        {   
-            delete this.workers[workerId];
-            this.db.delete(`/workers/${workerId}`);
-            
-            console.log(`Sending confirmReady command to ${workerId}`);
-
-            this.router.send([workerId, "", JSON.stringify(
-                {   id: uuidEmit(),
-                    command: "confirmReady"
-                })]);
-
-        }*/
 
 
         // Add background thread (setTimeout()) to check for workPendingStart items and put them back into the queue if passed the expiry threshold
@@ -118,10 +93,9 @@ module.exports = class Router
 
                 case "offline":
                     
-                    delete this.workers[clientId];
-                    this.db.delete(`/workers/${clientId}`);
-                    this.db.save();
-                    
+                    if(this.workers[message.queue] && this.workers[message.queue][clientId])
+                    {   delete this.workers[message.queue][clientId];
+                    }
 
                 break;
 
@@ -154,42 +128,19 @@ module.exports = class Router
 
                     }
 
-                    
-                    /*for(var workerId of Object.keys(this.workers))
-                    {   
-                        var worker = this.workers[workerId];
-
-                        if(worker.status == "ready")
-                        {   
-                            this.workPendingStart[message.id] = 
-                            {   workerId: workerId,
-                                pendingSince: (new Date()).getTime()
-                            }
-
-                            this.startWork(workerId, message.queue);
-
-                            break;
-
-                        }
-
-                    }*/
-
-                    
-
                 break;
 
 
                 case "workComplete":
                     
-                    console.log(`Work completed by ${clientId}. Result: ${JSON.stringify(message.output)}`);
-                    //this.workers[clientId].status = "ready";
+                    console.log(`Work for message ${message.id} completed by ${clientId}.`);
 
                     this.db.push(`/queues/${message.queue}/worked/${message.workId}`,
                         {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
                     this.db.save();
 
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
-                    this.router.send([message.producerId, {output: message.output}]);
+                    this.router.send([message.producerId, JSON.stringify({output: JSON.parse(message.output)})]);
 
                 break;
 
@@ -208,7 +159,11 @@ module.exports = class Router
 
         await this.mutex.runExclusive(async function()
             {   
-                var workerIds = Object.keys(_this.workers);
+                if(!_this.workers[message.queue])
+                {   _this.workers[message.queue] = {};            
+                }
+
+                var workerIds = Object.keys(_this.workers[message.queue]);
                 var nextWorkerIndex = _this.lastWorkerIndex + 1;
                 var timesWrapped = 0;
 
@@ -231,7 +186,7 @@ module.exports = class Router
                     //console.log(`Next worker index: ${nextWorkerIndex}, times wrapped: ${timesWrapped}`);
                     var nextWorkerId = workerIds[nextWorkerIndex];
 
-                    var worker = _this.workers[nextWorkerId];
+                    var worker = _this.workers[message.queue][nextWorkerId];
 
                     if(worker.status == "ready")
                     {   
@@ -240,9 +195,7 @@ module.exports = class Router
                         _this.lastWorkerIndex = nextWorkerIndex;
                         readyWorkerId =  nextWorkerId;
 
-                        _this.workers[readyWorkerId].status = "working";
-                        _this.db.push(`/workers/${readyWorkerId}`, _this.workers[readyWorkerId]);
-                        _this.db.save();
+                        _this.workers[message.queue][readyWorkerId].status = "working";
 
                         return;
 
@@ -287,7 +240,7 @@ module.exports = class Router
                 }
                 catch(err)
                 {   
-                    if(err.message && err.message.match(/Can't find index -1/g))
+                    if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
                     {
                         if(_this.debug)
                         {   console.log(`No work items in queue ${queue}`);
@@ -346,14 +299,16 @@ module.exports = class Router
         {   console.log(`Setting worker status for ${clientId} to ready`);            
         }
 
-        if(!this.workers[clientId])
-        {   this.workers[clientId] = {};
+        if(!this.workers[message.queue])
+        {   this.workers[message.queue] = {};            
         }
 
-        this.workers[clientId].status = "ready";
-        this.workers[clientId].lastActivity = (new Date()).getTime();
+        if(!this.workers[message.queue][clientId])
+        {   this.workers[message.queue][clientId] = {};
+        }
 
-        this.db.push(`/workers/${clientId}`, this.workers[clientId]);
+        this.workers[message.queue][clientId].status = "ready";
+        this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
 
         this.startWork(clientId, message.queue);
 
@@ -374,16 +329,23 @@ module.exports = class Router
     }
 
 
-    getWorkers()
+    getWorkers(queue)
     {
+        if(queue)
+        {   
+            return this.workers[queue];
+
+        }
+
+
         return this.workers;
 
     }
 
 
-    getWorker(workerId)
+    getWorker(workerId, queue)
     {
-        return this.workers[workerId];
+        return this.workers[queue][workerId];
 
     }
 

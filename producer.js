@@ -39,10 +39,11 @@ module.exports = class Producer
         await this.producer.send(JSON.stringify(message));
 
 
-        var output = null;
+        var output = {};
 
         if(wait)
-        {   [ output ] = await this.producer.receive();
+        {   var [ outputRaw ] = await this.producer.receive();
+            output = JSON.parse(outputRaw.toString("utf8"));
         }
 
 

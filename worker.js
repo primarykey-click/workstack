@@ -89,7 +89,7 @@ module.exports = class Worker
 
     exitClean()
     {   
-        this.sendMessage({command: "offline"});
+        this.sendMessage({command: "offline", queue: this.queue});
         this.worker.close();
         process.exit();
 
