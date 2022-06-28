@@ -185,6 +185,14 @@ module.exports = class Router
                 break;
 
 
+                case "getWorkers":
+
+                    var workers = this.getWorkers(message.queue);
+                    this.router.send([clientId, JSON.stringify({id: uuidEmit(), workers: workers})]);
+
+                break;
+
+
                 case "getWorkResult":
 
                     var workResult = await this.getWorkResult(message.workId);
@@ -444,13 +452,6 @@ module.exports = class Router
     }
 
 
-    getQueued(queue)
-    {
-        return this.cache.getData(`/queues/${queue}`);
-
-    }
-
-
     async getWorkResult(workId)
     {
         var response = await this.db.find({selector: {type: "workOutput", workId: workId}});
@@ -467,22 +468,9 @@ module.exports = class Router
 
 
     getWorkers(queue)
-    {
-        if(queue)
-        {   
-            return this.workers[queue];
+    {   var workers = this.workers[queue];
 
-        }
-
-
-        return this.workers;
-
-    }
-
-
-    getWorker(workerId, queue)
-    {
-        return this.workers[queue][workerId];
+        return workers ? workers : {};
 
     }
 
