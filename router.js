@@ -1,11 +1,11 @@
+const crypto = require("crypto");
 const PouchDB = require("pouchdb-node");
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 const { Mutex } = require("async-mutex");
 const { uuidEmit } = require("uuid-timestamp")
-//const zmq = require("zeromq/v5-compat");
 const zmq = require("zeromq");
-//const { socket } = require("zeromq/v5-compat");
+const WorkStackCrypto = require(`${__dirname}/local_modules/WorkStackCrypto`);
 
 PouchDB.plugin(require("pouchdb-find"));
 
@@ -13,6 +13,7 @@ PouchDB.plugin(require("pouchdb-find"));
 module.exports = class Router
 {
     workers = {};
+    producers = {};
     workPendingStart = {};
     router = null;
     listenPort = 5000;
@@ -20,6 +21,10 @@ module.exports = class Router
     readyExpiry = 30000;
     cleanupInterval = 60000;
     pendingWorkExpiry = 15000;
+    encrypt = false;
+    keyLength = 2048;
+    keyPair = null;
+    encryptAlgorithm = "aes-256-cbc";
     debug = false;
     dbDir = "./data/db";
     db = null;
@@ -40,12 +45,31 @@ module.exports = class Router
         this.readyExpiry = args.readyExpiry ? args.readyExpiry : this.readyExpiry;
         this.cleanupInterval = args.cleanupInterval ? args.cleanupInterval : this.cleanupInterval;
         this.pendingWorkExpiry = args.pendingWorkExpiry ? args.pendingWorkExpiry : this.pendingWorkExpiry;
+        this.encrypt = args.encrypt ? args.encrypt : this.encrypt;
+        this.encryptAlgorithm = args.encryptAlgorithm ? args.encryptAlgorithm : this.encryptAlgorithm;
+        this.keyLength = args.keyLength ? args.keyLength : this.keyLength;
         this.debug = args.debug ? args.debug : false;
         this.cacheFile = args.cacheFile ? args.cacheFile : (args.dbFile ? args.dbFile : this.cacheFile);
         this.dbDir = args.dbDir ? args.dbDir : this.dbDir;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
         this.authKey = args.authKey ? args.authKey : this.authKey;
         this.mutex = new Mutex();
+
+        if(this.encrypt)
+        {
+            this.keyPair = crypto.generateKeyPairSync("rsa",
+                {   modulusLength: this.keyLength,
+                    publicKeyEncoding:
+                    {   type: "spki",
+                        format: "pem"
+                    },
+                    privateKeyEncoding:
+                    {   type: "pkcs8",
+                        format: "pem"
+                    }
+                });
+
+        }
 
     }
 
@@ -86,7 +110,8 @@ module.exports = class Router
         for await (var [id, msg] of this.router)
         {   
             var clientId = id.toString("utf8");
-            var message = JSON.parse(msg.toString("utf8"));
+            var rawMessage = JSON.parse(msg.toString("utf8"));
+            var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, this.keyPair.privateKey, message.algorithm)) : rawMessage;
 
             
             switch(this.authMethod)
@@ -126,6 +151,26 @@ module.exports = class Router
                 break;
 
 
+                /*case "setKey":
+                
+                    this.producers[clientId].publicKey = message.publicKey;
+
+                break;*/
+
+
+                case "setGetKey":
+
+                    if(!this.producers[clientId])
+                    {   this.producers[clientId] = {};                        
+                    }
+
+                    this.producers[clientId].publicKey = message.publicKey;
+                    this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")}, null);
+                    console.log(this.producers);
+
+                break;
+
+
                 case "offline":
                     
                     if(this.workers[message.queue] && this.workers[message.queue][clientId])
@@ -136,7 +181,7 @@ module.exports = class Router
 
 
                 case "execWork":
-
+                    
                     var received = (new Date()).getTime();
 
                     this.cache.push(`/queues/${message.queue}/not-started[]`, 
@@ -180,7 +225,9 @@ module.exports = class Router
                     await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
 
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
-                    this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
+                    //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
+                    var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
+                    this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
 
                 break;
 
@@ -188,7 +235,9 @@ module.exports = class Router
                 case "getWorkers":
 
                     var workers = this.getWorkers(message.queue);
-                    this.router.send([clientId, JSON.stringify({id: uuidEmit(), workers: workers})]);
+                   // this.router.send([clientId, JSON.stringify({id: uuidEmit(), workers: workers})]);
+                   var clientPublicKey = this.encrypt ? this.workers[message.queue][clientId].publicKey : null;
+                   this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
 
                 break;
 
@@ -198,7 +247,9 @@ module.exports = class Router
                     var workResult = await this.getWorkResult(message.workId);
 
                     console.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
-                    this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
+                    //this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
+                    var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
+                    this.sendMessage(clientId, {id: uuidEmit(), workResult: workResult}, clientPublicKey);
 
                 break;
 
@@ -326,13 +377,21 @@ module.exports = class Router
 
                 console.log(`Assinging work ${workItem.workId} to ${workerId}`);
                 
-                _this.router.send([workerId, "", JSON.stringify(
+                /*_this.router.send([workerId, "", JSON.stringify(
                     {   command: "execWork",
                         queue: queue,
                         workId: workItem.workId,
                         data: workItem.data,
                         producerId: workItem.producerId
-                    })]);
+                    })]);*/
+                var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
+                _this.sendMessage(workerId,
+                    {   command: "execWork",
+                        queue: queue,
+                        workId: workItem.workId,
+                        data: workItem.data,
+                        producerId: workItem.producerId
+                    }, clientPublicKey);
 
                 var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
                 
@@ -369,7 +428,53 @@ module.exports = class Router
         this.workers[message.queue][clientId].status = "ready";
         this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
 
+        if(this.encrypt)
+        {
+            this.workers[message.queue][clientId].publicKey = message.publicKey;
+            this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+
+        }
+
         this.startWork(clientId, message.queue);
+
+    }
+
+
+    sendMessage(clientId, message, clientPublicKey)
+    {   
+        //this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
+
+        var modifiedMessage = message;
+
+        if(!message.id)
+        {   modifiedMessage.id = uuidEmit();            
+        }
+
+        if(message.command == "setKey" || !this.encrypt)
+        {   
+            this.router.send([clientId, JSON.stringify(modifiedMessage)]);
+
+        }
+        else
+        {   
+            /*var cipher = crypto.createCipheriv(this.encryptAlgorithm, Buffer.from(this.encryptPassword, "hex"), this.encryptIv);
+            var encryptedMessageContent = cipher.update(JSON.stringify(modifiedMessage));
+            encryptedMessageContent = Buffer.concat([encryptedMessageContent], cipher.final()).toString("base64");
+            var encryptedMessageContent = cipher.update();
+            var encryptedMessage = 
+                {   encrypted: true, 
+                    encryptedPassword: this.encryptedEncryptPassword, 
+                    encryptedIv: this.encryptedEncryptIv, 
+                    encryptedContent: encryptedMessageContent
+                };*/
+
+            var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), clientPublicKey, this.encryptAlgorithm);
+            //function(message, publicKey, password, iv, algorithm)
+            
+            this.router.send([clientId, JSON.stringify(encryptedMessage)]);
+
+        }
+        
 
     }
 
@@ -424,7 +529,7 @@ module.exports = class Router
                         
                         await _this.mutex.runExclusive(function ()
                             {   
-                                var workItem = _this.cache.get(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                                var workItem = _this.cache.getData(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
                                 
                                 _this.cache.push(`/queues/${pendingWork.queue}/not-started[]`, 
                                     {   received: workItem.received,

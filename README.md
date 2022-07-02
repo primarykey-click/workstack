@@ -99,3 +99,15 @@ var worker = new Worker(
 ```
 var producer = new Producer({authKey: "aequooLohkoa3ar2phee4sheeToxo6"});
 ```
+
+### Encryption
+Messages can be encrypted by setting the following parameter during initialization of each component (router, producer, worker):
+```
+encrypt: true
+```
+For example, to enable encryption for the router:
+```
+var router = new Router({encrypt: true});
+```
+If encryption is enabled on one of the components, it must then be enabled on *all* of the components (router, producer, worker).
+

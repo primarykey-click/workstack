@@ -1,6 +1,8 @@
+const crypto = require("crypto");
 const { Mutex } = require("async-mutex");
 const { uuidEmit } = require("uuid-timestamp")
 const zmq = require("zeromq/v5-compat");
+const WorkStackCrypto = require(`${__dirname}/local_modules/WorkStackCrypto`);
 
 
 module.exports = class Worker
@@ -14,6 +16,11 @@ module.exports = class Worker
     mutex = null;
     status = null;
     authKey = null;
+    encrypt = false;
+    keyLength = 2048;
+    keyPair = null;
+    encryptAlgorithm = "aes-256-cbc";
+    routerPublicKey = null;
 
 
     constructor(args)
@@ -24,10 +31,29 @@ module.exports = class Worker
         this.pingInterval = args.pingInterval ? args.pingInterval : this.pingInterval;
         this.debug = args.debug ? args.debug : false;
         this.authKey = args.authKey ? args.authKey : this.authKey;
+        this.encrypt = args.encrypt ? args.encrypt : this.encrypt;
+        this.keyLength = args.keyLength ? args.keyLength : this.keyLength;
+        this.encryptAlgorithm = args.encryptAlgorithm ? args.encryptAlgorithm : this.encryptAlgorithm;
         this.queue = args.queue;
         this.worker.identity = `worker-${args.workerId ? args.workerId : uuidEmit()}`;
         this.worker.work = args.work;
         this.mutex = new Mutex();
+
+        if(this.encrypt)
+        {
+            this.keyPair = crypto.generateKeyPairSync("rsa",
+                {   modulusLength: this.keyLength,
+                    publicKeyEncoding:
+                    {   type: "spki",
+                        format: "pem"
+                    },
+                    privateKeyEncoding:
+                    {   type: "pkcs8",
+                        format: "pem"
+                    }
+                });
+
+        }
         
     }
 
@@ -45,11 +71,15 @@ module.exports = class Worker
         this.pingRouter();
 
         
-        this.worker.on("message", async function(id, msg)
+        //this.worker.on("message", async function(id, msg)
+        this.worker.on("message", async function(msg)
             {   
-                var message = JSON.parse(msg.toString("utf8"));
+                var rawMessage = JSON.parse(msg.toString("utf8"));
+                var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, _this.keyPair.privateKey, rawMessage.algorithm)) : rawMessage;
 
-                console.log(`Received message with ID ${JSON.stringify(JSON.parse(msg.toString("utf8")).workId)} and command ${message.command}`);
+                if(message.command != "setKey") 
+                {   console.log(`Received message with ID ${JSON.stringify(JSON.parse(msg.toString("utf8")).id)} and command ${message.command}`);
+                }
 
 
                 switch(message.command)
@@ -71,6 +101,17 @@ module.exports = class Worker
                                     });
                                 
                                 _this.sendReady();
+
+                            });
+
+                    break;
+
+
+                    case "setKey":
+                        
+                        await _this.mutex.runExclusive(async function()
+                            {   
+                                _this.routerPublicKey = message.publicKey;
 
                             });
 
@@ -122,7 +163,7 @@ module.exports = class Worker
         }
 
         if(!message.id)
-        {   message.id = uuidEmit();            
+        {   modifiedMessage.id = uuidEmit();            
         }
 
         if(this.debug)
@@ -136,7 +177,24 @@ module.exports = class Worker
 
         }
 
-        this.worker.send([JSON.stringify(modifiedMessage)]);
+        if(message.command == "ready" || !this.encrypt)
+        {
+            this.worker.send([JSON.stringify(modifiedMessage)]);
+
+        }
+        else
+        {   
+            /*var messageBuffer = Buffer.from(JSON.stringify(modifiedMessage));
+            var encryptedMessageContent = crypto.publicEncrypt(this.routerPublicKey, messageBuffer).toString("base64"); 
+            var encryptedMessage = {encrypted: true, encryptedContent: encryptedMessageContent};*/
+            //function(message, publicKey, password, iv, algorithm)
+            
+            var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), this.routerPublicKey, this.encryptAlgorithm);
+            
+            this.worker.send([JSON.stringify(encryptedMessage)]);
+
+        }
+        
 
     }
 
@@ -148,7 +206,24 @@ module.exports = class Worker
         }
 
         this.status = "ready";
-        this.sendMessage({command: "ready", queue: this.queue});
+
+        if(this.encrypt)
+        {   
+            this.sendMessage(
+                {   command: "ready", 
+                    queue: this.queue, 
+                    publicKey: this.keyPair.publicKey.toString("utf8")
+                });
+
+        }
+        else
+        {   
+            this.sendMessage(
+                {   command: "ready", 
+                    queue: this.queue
+                });
+
+        }
 
     }
 
