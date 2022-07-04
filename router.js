@@ -166,7 +166,7 @@ module.exports = class Router
 
                     this.producers[clientId].publicKey = message.publicKey;
                     this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")}, null);
-                    console.log(this.producers);
+                    //console.log(this.producers);
 
                 break;
 
@@ -222,6 +222,7 @@ module.exports = class Router
                     //    {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
                     //this.cache.save();
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
+                    await this.cache.save();
                     await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
 
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
@@ -375,7 +376,7 @@ module.exports = class Router
                 }
 
 
-                console.log(`Assinging work ${workItem.workId} to ${workerId}`);
+                console.log(`Assigning work ${workItem.workId} to ${workerId}`);
                 
                 /*_this.router.send([workerId, "", JSON.stringify(
                     {   command: "execWork",
@@ -539,10 +540,11 @@ module.exports = class Router
                                     });
 
                                 _this.cache.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                                _this.cache.save();
 
+                                delete _this.workPendingStart[workerId];
                                 delete _this.workers[pendingWork.queue][workerId];
                                 
-
                             });
 
                     }
