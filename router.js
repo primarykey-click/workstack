@@ -237,7 +237,7 @@ module.exports = class Router
 
                     var workers = this.getWorkers(message.queue);
                    // this.router.send([clientId, JSON.stringify({id: uuidEmit(), workers: workers})]);
-                   var clientPublicKey = this.encrypt ? this.workers[message.queue][clientId].publicKey : null;
+                   var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
                    this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
 
                 break;
