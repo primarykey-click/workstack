@@ -206,9 +206,7 @@ module.exports = class Router
 
                     }
                     else
-                    {   console.log("Ready worker ID: ", readyWorkerId);
-                        console.log(`[${new Date()}] No workers ready: queueing message ${message.id}`);
-
+                    {   console.log(`[${new Date()}] No workers ready: queueing message ${message.id}`);
                     }
 
                 break;
@@ -312,7 +310,7 @@ module.exports = class Router
                     }
                     else
                     {   
-                        console.log(`Worker ${worker.id} not ready.  Worker: ${JSON.stringify(worker)}`);
+                        console.log(`Worker ${nextWorkerId} not ready.  Worker: ${JSON.stringify(worker)}`);
                         nextWorkerIndex++;
 
                         if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
@@ -394,13 +392,13 @@ module.exports = class Router
 
                 /* Update worker status */
 
-                this.workPendingStart[readyWorkerId] = 
-                    {   queue: message.queue,
-                        workId: message.id,
+                _this.workPendingStart[workerId] = 
+                    {   queue: queue,
+                        workId: workItem.workId,
                         pendingSince: (new Date()).getTime()
                     }
                 
-                _this.workers[message.queue][readyWorkerId].status = "working";
+                _this.workers[queue][workerId].status = "working";
 
 
                 /* Update cache */
@@ -425,6 +423,9 @@ module.exports = class Router
 
     setWorkerReady(clientId, message)
     {   
+        var _this = this;
+
+        
         if(this.debug)
         {   console.log(`Setting worker status for ${clientId} to ready`);            
         }
@@ -437,17 +438,29 @@ module.exports = class Router
         {   this.workers[message.queue][clientId] = {};
         }
 
-        this.workers[message.queue][clientId].status = "ready";
-        this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
+        this.mutex.runExclusive(
+            function ()
+            {
+                _this.workers[message.queue][clientId].status = "ready";
+                _this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
 
-        if(this.encrypt)
-        {
-            this.workers[message.queue][clientId].publicKey = message.publicKey;
-            this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+                return Promise.resolve();
 
-        }
+            })
+            .then(
+                function()
+                {   
+                    if(_this.encrypt)
+                    {
+                        _this.workers[message.queue][clientId].publicKey = message.publicKey;
+                        _this.sendMessage(clientId, {command: "setKey", publicKey: _this.keyPair.publicKey.toString("utf8")});
+            
+                    }
+                
+                    _this.startWork(clientId, message.queue);
 
-        this.startWork(clientId, message.queue);
+                }
+            );
 
     }
 
@@ -587,6 +600,7 @@ module.exports = class Router
 
     getWorkers(queue)
     {   var workers = this.workers[queue];
+        //console.log("Workers:" , workers);
 
         return workers ? workers : {};
 
