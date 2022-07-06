@@ -265,7 +265,10 @@ module.exports = class Router
         var readyWorkerId = null;
 
 
-        await this.mutex.runExclusive(async function()
+        //await this.mutex.runExclusive(function()
+        var release = await this.mutex.acquire();
+
+        try
             {   
                 if(!_this.workers[message.queue])
                 {   _this.workers[message.queue] = {};            
@@ -310,7 +313,7 @@ module.exports = class Router
                     }
                     else
                     {   
-                        console.log(`Worker ${nextWorkerId} not ready.  Worker: ${JSON.stringify(worker)}`);
+                        console.log(`Worker ${nextWorkerId} not ready.  Worker status: ${worker.status}`);
                         nextWorkerIndex++;
 
                         if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
@@ -323,7 +326,12 @@ module.exports = class Router
 
                 }
 
-            });
+            }//);
+        finally
+        {
+            release();
+
+        }
 
         
         return readyWorkerId;
@@ -336,7 +344,10 @@ module.exports = class Router
         var _this = this;
 
 
-        await this.mutex.runExclusive(async function()
+        //await this.mutex.runExclusive(function()
+        var release = await this.mutex.acquire();
+
+            try
             {
                 var workItem = null;
 
@@ -399,6 +410,7 @@ module.exports = class Router
                     }
                 
                 _this.workers[queue][workerId].status = "working";
+                console.log("Set working: ", new Date());
 
 
                 /* Update cache */
@@ -416,16 +428,20 @@ module.exports = class Router
                     });
                 _this.cache.save();
 
-            });
+            }//);
+            finally
+            {
+                release();
+
+            }
 
     }
 
 
-    setWorkerReady(clientId, message)
+    async setWorkerReady(clientId, message)
     {   
         var _this = this;
 
-        
         if(this.debug)
         {   console.log(`Setting worker status for ${clientId} to ready`);            
         }
@@ -438,7 +454,7 @@ module.exports = class Router
         {   this.workers[message.queue][clientId] = {};
         }
 
-        this.mutex.runExclusive(
+        /*this.mutex.runExclusive(
             function ()
             {
                 _this.workers[message.queue][clientId].status = "ready";
@@ -458,7 +474,49 @@ module.exports = class Router
                     _this.startWork(clientId, message.queue);
 
                 }
-            );
+            );*/
+
+        const release = await this.mutex.acquire();
+
+        try
+        {   
+            if(this.workPendingStart[clientId])
+            {
+                console.log(`Ignorming ready command from worker ${clientId} as this worker has work pending start`);
+
+                release();
+    
+                
+                return;
+    
+            }
+            
+            
+            this.workers[message.queue][clientId].status = "ready";
+            console.log("Set worker ready: ", new Date());
+            this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
+
+        }
+        catch(err)
+        {   
+            console.log(err);
+
+        }
+        finally
+        {
+            release();
+
+        }
+
+
+        if(this.encrypt)
+        {
+            this.workers[message.queue][clientId].publicKey = message.publicKey;
+            this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+
+        }
+    
+        this.startWork(clientId, message.queue);
 
     }
 
@@ -516,7 +574,10 @@ module.exports = class Router
             {   
                 /* Purge expired workers */
 
-                await _this.mutex.runExclusive(function ()
+                //await _this.mutex.runExclusive(function ()
+                var release = await _this.mutex.acquire();
+                    try
+                
                     {   
                         for(var queue of Object.keys(_this.workers))
                         {   
@@ -536,7 +597,12 @@ module.exports = class Router
 
                         }
 
-                    });
+                    }//);
+                    finally
+                    {
+                        release();
+
+                    }
 
                 
                 /* Re-queue orphaned work */
@@ -550,7 +616,10 @@ module.exports = class Router
                     {   
                         console.log(`Requeuing orphaned work item with ID ${pendingWork.workId} pending since ${(new Date(pendingWork.pendingSince)).toString()}`);
                         
-                        await _this.mutex.runExclusive(function ()
+                        //await _this.mutex.runExclusive(function ()
+                        release = await _this.mutex.acquire();
+
+                        try
                             {   
                                 var workItem = _this.cache.getData(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
                                 
@@ -567,7 +636,12 @@ module.exports = class Router
                                 delete _this.workPendingStart[workerId];
                                 delete _this.workers[pendingWork.queue][workerId];
                                 
-                            });
+                            }//);
+                        finally
+                        {
+                            release();
+
+                        }
 
                     }
 

@@ -86,7 +86,10 @@ module.exports = class Worker
                 {
                     case "execWork":
                         
-                        await _this.mutex.runExclusive(async function()
+                        //await _this.mutex.runExclusive(function()
+                        var release = await _this.mutex.acquire();
+
+                            try
                             {   
                                 _this.status = "working";
                                 _this.sendMessage({command: "working"});
@@ -102,18 +105,32 @@ module.exports = class Worker
                                 
                                 _this.sendReady();
 
-                            });
+                            }//);
+                            finally
+                            {
+                                release();
+
+                            }
+
 
                     break;
 
 
                     case "setKey":
                         
-                        await _this.mutex.runExclusive(async function()
+                        //await _this.mutex.runExclusive(function()
+                        var release = await _this.mutex.acquire();
+
+                            try
                             {   
                                 _this.routerPublicKey = message.publicKey;
 
-                            });
+                            }//);
+                            finally
+                            {
+                                release();
+
+                            }
 
                     break;
 
@@ -143,9 +160,23 @@ module.exports = class Worker
 
         setTimeout(async function()
             {   
-                await _this.mutex.runExclusive(function ()
-                    {   _this.sendReady();
-                    });
+                //await _this.mutex.runExclusive(function ()
+                var release = await _this.mutex.acquire();
+
+                    try
+                    {   
+                        if(_this.status == "ready")
+                        {   
+                            _this.sendReady();
+
+                        }
+
+                    }//);
+                    finally
+                    {
+                        release();
+
+                    }
                 
                 _this.pingRouter();
 
