@@ -444,8 +444,6 @@ module.exports = class Router
                 _this.workers[message.queue][clientId].status = "ready";
                 _this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
 
-                return Promise.resolve();
-
             })
             .then(
                 function()
