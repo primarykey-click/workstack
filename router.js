@@ -196,11 +196,11 @@ module.exports = class Router
 
                     if(readyWorkerId)
                     {   
-                        this.workPendingStart[readyWorkerId] = 
+                        /*this.workPendingStart[readyWorkerId] = 
                         {   queue: message.queue,
                             workId: message.id,
                             pendingSince: (new Date()).getTime()
-                        }
+                        }*/
 
                         this.startWork(readyWorkerId, message.queue);
 
@@ -305,9 +305,9 @@ module.exports = class Router
                         _this.lastWorkerIndex = nextWorkerIndex;
                         readyWorkerId =  nextWorkerId;
 
-                        _this.workers[message.queue][readyWorkerId].status = "working";
+                        //_this.workers[message.queue][readyWorkerId].status = "working";
 
-                        return;
+                        break;
 
                     }
                     else
@@ -317,7 +317,7 @@ module.exports = class Router
 
                         if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
                         {
-                            return null;
+                            break;
 
                         }
 
@@ -378,14 +378,11 @@ module.exports = class Router
 
                 console.log(`Assigning work ${workItem.workId} to ${workerId}`);
                 
-                /*_this.router.send([workerId, "", JSON.stringify(
-                    {   command: "execWork",
-                        queue: queue,
-                        workId: workItem.workId,
-                        data: workItem.data,
-                        producerId: workItem.producerId
-                    })]);*/
+                
+                /* Send work to worker */
+
                 var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
+                
                 _this.sendMessage(workerId,
                     {   command: "execWork",
                         queue: queue,
@@ -393,6 +390,20 @@ module.exports = class Router
                         data: workItem.data,
                         producerId: workItem.producerId
                     }, clientPublicKey);
+
+
+                /* Update worker status */
+
+                this.workPendingStart[readyWorkerId] = 
+                    {   queue: message.queue,
+                        workId: message.id,
+                        pendingSince: (new Date()).getTime()
+                    }
+                
+                _this.workers[message.queue][readyWorkerId].status = "working";
+
+
+                /* Update cache */
 
                 var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
                 
