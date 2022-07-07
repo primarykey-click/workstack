@@ -86,31 +86,30 @@ module.exports = class Worker
                 {
                     case "execWork":
                         
-                        //await _this.mutex.runExclusive(function()
                         var release = await _this.mutex.acquire();
 
-                            try
-                            {   
-                                _this.status = "working";
-                                _this.sendMessage({command: "working"});
-                                
-                                var output = await _this.worker.work(message.data);
-                                _this.sendMessage(
-                                    {   command: "workComplete",
-                                        queue: message.queue,
-                                        workId: message.workId,
-                                        producerId: message.producerId,
-                                        output: JSON.stringify(output)
-                                    });
-                                
-                                _this.sendReady();
+                        try
+                        {   
+                            _this.status = "working";
+                            _this.sendMessage({command: "working"});
+                            
+                            var output = await _this.worker.work(message.data);
+                            _this.sendMessage(
+                                {   command: "workComplete",
+                                    queue: message.queue,
+                                    workId: message.workId,
+                                    producerId: message.producerId,
+                                    output: JSON.stringify(output)
+                                });
+                            
+                            _this.sendReady();
 
-                            }//);
-                            finally
-                            {
-                                release();
+                        }
+                        finally
+                        {
+                            release();
 
-                            }
+                        }
 
 
                     break;
@@ -118,19 +117,18 @@ module.exports = class Worker
 
                     case "setKey":
                         
-                        //await _this.mutex.runExclusive(function()
                         var release = await _this.mutex.acquire();
 
-                            try
-                            {   
-                                _this.routerPublicKey = message.publicKey;
+                        try
+                        {   
+                            _this.routerPublicKey = message.publicKey;
 
-                            }//);
-                            finally
-                            {
-                                release();
+                        }
+                        finally
+                        {
+                            release();
 
-                            }
+                        }
 
                     break;
 
@@ -160,23 +158,22 @@ module.exports = class Worker
 
         setTimeout(async function()
             {   
-                //await _this.mutex.runExclusive(function ()
                 var release = await _this.mutex.acquire();
 
-                    try
+                try
+                {   
+                    if(_this.status == "ready")
                     {   
-                        if(_this.status == "ready")
-                        {   
-                            _this.sendReady();
-
-                        }
-
-                    }//);
-                    finally
-                    {
-                        release();
+                        _this.sendReady();
 
                     }
+
+                }
+                finally
+                {
+                    release();
+
+                }
                 
                 _this.pingRouter();
 
@@ -215,11 +212,6 @@ module.exports = class Worker
         }
         else
         {   
-            /*var messageBuffer = Buffer.from(JSON.stringify(modifiedMessage));
-            var encryptedMessageContent = crypto.publicEncrypt(this.routerPublicKey, messageBuffer).toString("base64"); 
-            var encryptedMessage = {encrypted: true, encryptedContent: encryptedMessageContent};*/
-            //function(message, publicKey, password, iv, algorithm)
-            
             var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), this.routerPublicKey, this.encryptAlgorithm);
             
             this.worker.send([JSON.stringify(encryptedMessage)]);

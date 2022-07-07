@@ -265,68 +265,67 @@ module.exports = class Router
         var readyWorkerId = null;
 
 
-        //await this.mutex.runExclusive(function()
         var release = await this.mutex.acquire();
 
         try
+        {   
+            if(!_this.workers[message.queue])
+            {   _this.workers[message.queue] = {};            
+            }
+
+            var workerIds = Object.keys(_this.workers[message.queue]);
+            var nextWorkerIndex = _this.lastWorkerIndex + 1;
+            var timesWrapped = 0;
+
+            if(workerIds.length == 0)
             {   
-                if(!_this.workers[message.queue])
-                {   _this.workers[message.queue] = {};            
+                console.log(`No workers online`);
+            
+                return null;
+
+            }
+
+
+            while(true)
+            {   
+                if(nextWorkerIndex >= workerIds.length)
+                {   nextWorkerIndex = 0;
+                    timesWrapped++;
                 }
 
-                var workerIds = Object.keys(_this.workers[message.queue]);
-                var nextWorkerIndex = _this.lastWorkerIndex + 1;
-                var timesWrapped = 0;
+                //console.log(`Next worker index: ${nextWorkerIndex}, times wrapped: ${timesWrapped}`);
+                var nextWorkerId = workerIds[nextWorkerIndex];
 
-                if(workerIds.length == 0)
+                var worker = _this.workers[message.queue][nextWorkerId];
+
+                if(worker.status == "ready")
                 {   
-                    console.log(`No workers online`);
-                
-                    return null;
+                    console.log(`Reserving worker ${nextWorkerId}`);
+
+                    _this.lastWorkerIndex = nextWorkerIndex;
+                    readyWorkerId =  nextWorkerId;
+
+                    //_this.workers[message.queue][readyWorkerId].status = "working";
+
+                    break;
 
                 }
-
-
-                while(true)
+                else
                 {   
-                    if(nextWorkerIndex >= workerIds.length)
-                    {   nextWorkerIndex = 0;
-                        timesWrapped++;
-                    }
+                    console.log(`Worker ${nextWorkerId} not ready.  Worker status: ${worker.status}`);
+                    nextWorkerIndex++;
 
-                    //console.log(`Next worker index: ${nextWorkerIndex}, times wrapped: ${timesWrapped}`);
-                    var nextWorkerId = workerIds[nextWorkerIndex];
-
-                    var worker = _this.workers[message.queue][nextWorkerId];
-
-                    if(worker.status == "ready")
-                    {   
-                        console.log(`Reserving worker ${nextWorkerId}`);
-
-                        _this.lastWorkerIndex = nextWorkerIndex;
-                        readyWorkerId =  nextWorkerId;
-
-                        //_this.workers[message.queue][readyWorkerId].status = "working";
-
+                    if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
+                    {
                         break;
 
                     }
-                    else
-                    {   
-                        console.log(`Worker ${nextWorkerId} not ready.  Worker status: ${worker.status}`);
-                        nextWorkerIndex++;
-
-                        if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
-                        {
-                            break;
-
-                        }
-
-                    }
 
                 }
 
-            }//);
+            }
+
+        }
         finally
         {
             release();
@@ -344,96 +343,95 @@ module.exports = class Router
         var _this = this;
 
 
-        //await this.mutex.runExclusive(function()
         var release = await this.mutex.acquire();
 
+        try
+        {
+            var workItem = null;
+
+            
             try
-            {
-                var workItem = null;
-
-                
-                try
-                {   
-                    workItem = _this.cache.getData(`/queues/${queue}/not-started[-1]`);
-
-                }
-                catch(err)
-                {   
-                    if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
-                    {
-                        if(_this.debug)
-                        {   console.log(`No work items in queue ${queue}`);
-                        }
-
-                    }
-                    else
-                    {   console.log(err);                       
-                    }
-
-                
-                    return;
-
-                }
-
-
-                if(!workItem)
-                {
-                    console.log(`No work items found`);
-
-                    return;
-
-                }
-
-
-                console.log(`Assigning work ${workItem.workId} to ${workerId}`);
-                
-                
-                /* Send work to worker */
-
-                var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
-                
-                _this.sendMessage(workerId,
-                    {   command: "execWork",
-                        queue: queue,
-                        workId: workItem.workId,
-                        data: workItem.data,
-                        producerId: workItem.producerId
-                    }, clientPublicKey);
-
-
-                /* Update worker status */
-
-                _this.workPendingStart[workerId] = 
-                    {   queue: queue,
-                        workId: workItem.workId,
-                        pendingSince: (new Date()).getTime()
-                    }
-                
-                _this.workers[queue][workerId].status = "working";
-                console.log("Set working: ", new Date());
-
-
-                /* Update cache */
-
-                var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
-                
-                _this.cache.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
-                _this.cache.push(`/queues/${queue}/worked/${workItem.workId}`, 
-                    {   received: workItem.received,
-                        started: (new Date()).getTime(),
-                        status: "in-progress",
-                        workerId: workerId,
-                        producerId: workItem.producerId,
-                        data: workItem.data
-                    });
-                _this.cache.save();
-
-            }//);
-            finally
-            {
-                release();
+            {   
+                workItem = _this.cache.getData(`/queues/${queue}/not-started[-1]`);
 
             }
+            catch(err)
+            {   
+                if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
+                {
+                    if(_this.debug)
+                    {   console.log(`No work items in queue ${queue}`);
+                    }
+
+                }
+                else
+                {   console.log(err);                       
+                }
+
+            
+                return;
+
+            }
+
+
+            if(!workItem)
+            {
+                console.log(`No work items found`);
+
+                return;
+
+            }
+
+
+            console.log(`Assigning work ${workItem.workId} to ${workerId}`);
+            
+            
+            /* Send work to worker */
+
+            var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
+            
+            _this.sendMessage(workerId,
+                {   command: "execWork",
+                    queue: queue,
+                    workId: workItem.workId,
+                    data: workItem.data,
+                    producerId: workItem.producerId
+                }, clientPublicKey);
+
+
+            /* Update worker status */
+
+            _this.workPendingStart[workerId] = 
+                {   queue: queue,
+                    workId: workItem.workId,
+                    pendingSince: (new Date()).getTime()
+                }
+            
+            _this.workers[queue][workerId].status = "working";
+            //console.log("Set working: ", new Date());
+
+
+            /* Update cache */
+
+            var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
+            
+            _this.cache.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
+            _this.cache.push(`/queues/${queue}/worked/${workItem.workId}`, 
+                {   received: workItem.received,
+                    started: (new Date()).getTime(),
+                    status: "in-progress",
+                    workerId: workerId,
+                    producerId: workItem.producerId,
+                    data: workItem.data
+                });
+            _this.cache.save();
+
+        }
+        finally
+        {
+            release();
+
+        }
 
     }
 
@@ -454,27 +452,6 @@ module.exports = class Router
         {   this.workers[message.queue][clientId] = {};
         }
 
-        /*this.mutex.runExclusive(
-            function ()
-            {
-                _this.workers[message.queue][clientId].status = "ready";
-                _this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
-
-            })
-            .then(
-                function()
-                {   
-                    if(_this.encrypt)
-                    {
-                        _this.workers[message.queue][clientId].publicKey = message.publicKey;
-                        _this.sendMessage(clientId, {command: "setKey", publicKey: _this.keyPair.publicKey.toString("utf8")});
-            
-                    }
-                
-                    _this.startWork(clientId, message.queue);
-
-                }
-            );*/
 
         const release = await this.mutex.acquire();
 
@@ -493,13 +470,7 @@ module.exports = class Router
             
             
             this.workers[message.queue][clientId].status = "ready";
-            console.log("Set worker ready: ", new Date());
             this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();
-
-        }
-        catch(err)
-        {   
-            console.log(err);
 
         }
         finally
@@ -574,35 +545,34 @@ module.exports = class Router
             {   
                 /* Purge expired workers */
 
-                //await _this.mutex.runExclusive(function ()
                 var release = await _this.mutex.acquire();
-                    try
-                
+                    
+                try
+                {   
+                    for(var queue of Object.keys(_this.workers))
                     {   
-                        for(var queue of Object.keys(_this.workers))
+                        for(var workerId of Object.keys(_this.workers[queue]))
                         {   
-                            for(var workerId of Object.keys(_this.workers[queue]))
+                            var lastActivity = _this.workers[queue][workerId].lastActivity;
+                            var now = (new Date()).getTime();
+                            
+                            if(now - lastActivity >= _this.readyExpiry)
                             {   
-                                var lastActivity = _this.workers[queue][workerId].lastActivity;
-                                var now = (new Date()).getTime();
-                                
-                                if(now - lastActivity >= _this.readyExpiry)
-                                {   
-                                    console.log(`Purging expired worker ${workerId}`);
-                                    delete _this.workers[queue][workerId];
-
-                                }
+                                console.log(`Purging expired worker ${workerId}`);
+                                delete _this.workers[queue][workerId];
 
                             }
 
                         }
 
-                    }//);
-                    finally
-                    {
-                        release();
-
                     }
+
+                }
+                finally
+                {
+                    release();
+
+                }
 
                 
                 /* Re-queue orphaned work */
@@ -616,27 +586,26 @@ module.exports = class Router
                     {   
                         console.log(`Requeuing orphaned work item with ID ${pendingWork.workId} pending since ${(new Date(pendingWork.pendingSince)).toString()}`);
                         
-                        //await _this.mutex.runExclusive(function ()
                         release = await _this.mutex.acquire();
 
                         try
-                            {   
-                                var workItem = _this.cache.getData(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
-                                
-                                _this.cache.push(`/queues/${pendingWork.queue}/not-started[]`, 
-                                    {   received: workItem.received,
-                                        workId: pendingWork.workId,
-                                        data: workItem.data,
-                                        producerId: workItem.producerId
-                                    });
+                        {   
+                            var workItem = _this.cache.getData(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                            
+                            _this.cache.push(`/queues/${pendingWork.queue}/not-started[]`, 
+                                {   received: workItem.received,
+                                    workId: pendingWork.workId,
+                                    data: workItem.data,
+                                    producerId: workItem.producerId
+                                });
 
-                                _this.cache.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
-                                _this.cache.save();
+                            _this.cache.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
+                            _this.cache.save();
 
-                                delete _this.workPendingStart[workerId];
-                                delete _this.workers[pendingWork.queue][workerId];
-                                
-                            }//);
+                            delete _this.workPendingStart[workerId];
+                            delete _this.workers[pendingWork.queue][workerId];
+                            
+                        }
                         finally
                         {
                             release();
