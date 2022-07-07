@@ -647,5 +647,32 @@ module.exports = class Router
 
     }
 
+
+    getQueues()
+    {
+        return this.workers ? this.workers : {};
+
+    }
+
+
+    getPendingWork()
+    {
+        return this.workPendingStart ? this.workPendingStart : {};
+
+    }
+
+
+    getDiagnostics()
+    {
+        var diagnostics = 
+        {   queues: this.getQueues(),
+            pendingWork: this.getPendingWork()            
+        }
+
+
+        return diagnostics;
+
+    }
+
 }
         
