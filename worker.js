@@ -78,7 +78,7 @@ module.exports = class Worker
                 var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, _this.keyPair.privateKey, rawMessage.algorithm)) : rawMessage;
 
                 if(message.command != "setKey") 
-                {   console.log(`Received message with ID ${JSON.stringify(JSON.parse(msg.toString("utf8")).id)} and command ${message.command}`);
+                {   console.log(`Received message with ID ${message.id} and command ${message.command}`);
                 }
 
 
