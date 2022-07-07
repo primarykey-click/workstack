@@ -231,12 +231,20 @@ module.exports = class Router
                 break;
 
 
+                case "getDiagnostics":
+
+                    var diagnostics = this.getDiagnostics();
+                    var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
+                    this.sendMessage(clientId, {id: uuidEmit(), diagnostics: diagnostics}, clientPublicKey);
+
+                break;
+
+
                 case "getWorkers":
 
                     var workers = this.getWorkers(message.queue);
-                   // this.router.send([clientId, JSON.stringify({id: uuidEmit(), workers: workers})]);
-                   var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                   this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
+                    var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
+                    this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
 
                 break;
 
