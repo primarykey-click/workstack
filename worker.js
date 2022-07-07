@@ -93,7 +93,7 @@ module.exports = class Worker
                             _this.status = "working";
                             _this.sendMessage({command: "working"});
                             
-                            var output = await _this.worker.work(message.data);
+                            var output = await _this.worker.work({workId: message.workId, data: message.data});
                             _this.sendMessage(
                                 {   command: "workComplete",
                                     queue: message.queue,
