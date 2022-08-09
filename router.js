@@ -90,13 +90,15 @@ module.exports = class Router
 
 
     startManagementListener()
-    {
+    {   
+        var _this = this;
+
         var app = express();
         app.get("/workers", async function(req, res, next)
             {   
                 try
                 {   
-                    var workers = this.getWorkers(req.query.queue);
+                    var workers = _this.getWorkers(req.query.queue);
                     res.json(workers);
 
                 }
