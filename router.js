@@ -111,7 +111,19 @@ module.exports = class Router
         {   
             var clientId = id.toString("utf8");
             var rawMessage = JSON.parse(msg.toString("utf8"));
-            var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, this.keyPair.privateKey)) : rawMessage;
+            var message = null;
+            
+            try
+            {   message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, this.keyPair.privateKey)) : rawMessage;
+            }
+            catch(err)
+            {
+                console.log(`Error decrypting message.  Key length: ${this.keyLength}`);
+                console.log(`Message: `, JSON.stringify(message, null, "\t"));
+                
+                throw(err);
+
+            }
 
             
             switch(this.authMethod)
