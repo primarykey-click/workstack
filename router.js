@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const express = require("express");
 const PouchDB = require("pouchdb-node");
 const { JsonDB } = require("node-json-db");
 const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
@@ -17,6 +18,7 @@ module.exports = class Router
     workPendingStart = {};
     router = null;
     listenPort = 5000;
+    managementPort = 5001;
     listenInterface = "*";
     readyExpiry = 30000;
     cleanupInterval = 60000;
@@ -40,6 +42,7 @@ module.exports = class Router
         //this.events = this.router.events;
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
+        this.managementPort = args.managementPort ? args.managementPort : this.managementPort;
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
         this.readyExpiry = args.readyExpiry ? args.readyExpiry : this.readyExpiry;
@@ -86,8 +89,37 @@ module.exports = class Router
     }*/
 
 
+    startManagementListener()
+    {
+        var app = express();
+        app.get("/workers", async function(req, res, next)
+            {   
+                try
+                {   
+                    var workers = this.getWorkers(req.query.queue);
+                    res.json(workers);
+
+                }
+                catch(err)
+                {
+                    next(err);
+
+                }
+                                
+            });
+
+
+        app.listen(managementPort);
+        console.log(`Express started on port ${managementPort}`);
+
+    }
+
+
     async start()
     {   
+        this.startManagementListener();
+
+
         this.cache = new JsonDB(new JsonDbConfig(this.cacheFile, false, true, "/"));
         
         this.db = new PouchDB(`${this.dbDir}/workstack`);
