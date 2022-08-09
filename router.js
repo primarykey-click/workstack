@@ -109,8 +109,8 @@ module.exports = class Router
             });
 
 
-        app.listen(managementPort);
-        console.log(`Express started on port ${managementPort}`);
+        app.listen(this.managementPort);
+        console.log(`Express started on port ${this.managementPort}`);
 
     }
 
