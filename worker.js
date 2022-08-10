@@ -186,9 +186,10 @@ module.exports = class Worker
         }
         else
         {   
-            if(message.command != "ready" || (message.command == "ready" && this.debug))
+            /*if(message.command != "ready" || (message.command == "ready" && this.debug))
             {   console.log(`Sending message with ID ${message.id} and command "${message.command}"`);            
-            }
+            }*/
+            console.log(`Sending message with ID ${message.id} and command "${message.command}"`);            
 
         }
 

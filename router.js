@@ -24,7 +24,7 @@ module.exports = class Router
     listenInterface = "*";
     readyExpiry = 30000;
     cleanupInterval = 60000;
-    pendingWorkExpiry = 15000;
+    pendingWorkExpiry = 600000;  //15000;
     encrypt = false;
     keyLength = 2048;
     keyPair = null;
@@ -190,9 +190,10 @@ module.exports = class Router
 
             }
 
-            if(message.command != "ready" || (message.command == "ready" && this.debug))
+            /*if(message.command != "ready" || (message.command == "ready" && this.debug))
             {   console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
-            }
+            }*/
+            console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
 
             
             switch(message.command)
