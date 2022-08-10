@@ -641,14 +641,13 @@ module.exports = class Router
                             var worker = _this.workers[queue][workerId];
                             console.log(`Inspecting worker ${JSON.stringify(worker, null, "\t")}`);
                             
-                            var status = _this.workers[queue][workerId].status;
-                            if(status == "working")
+                            if(worker.status == "working")
                             {   
                                 continue;
 
                             }
                             
-                            var lastActivity = _this.workers[queue][workerId].lastActivity;
+                            var lastActivity = worker.lastActivity;
                             var now = (new Date()).getTime();
                             
                             if(now - lastActivity >= _this.readyExpiry)
@@ -675,11 +674,12 @@ module.exports = class Router
                 for(var workerId of Object.keys(_this.workPendingStart))
                 {
                     var pendingWork = _this.workPendingStart[workerId];
+                    console.log(`Pending work: ${JSON.stringify(_this.workPendingStart, null, "\t")}`);
                     var now = (new Date()).getTime();
 
                     if(now - pendingWork.pendingSince >= _this.pendingWorkExpiry)
                     {   
-                        console.log(`Requeuing orphaned work item with ID ${pendingWork.workId} pending since ${(new Date(pendingWork.pendingSince)).toString()}`);
+                        console.log(`Requeuing orphaned work item with ID ${pendingWork.workId} for worker ${workerId} pending since ${(new Date(pendingWork.pendingSince)).toString()}`);
                         
                         release = await _this.mutex.acquire();
 
