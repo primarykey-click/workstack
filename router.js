@@ -206,7 +206,7 @@ module.exports = class Router
 
                 case "ready":
                     
-                    this.setWorkerReady(clientId, message);
+                    await this.setWorkerReady(clientId, message);
 
                 break;
 
