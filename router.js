@@ -552,6 +552,16 @@ module.exports = class Router
                 return;
     
             }
+            else if(this.workers[message.queue][clientId].status == "working")
+            {
+                console.log(`Ignoring ready command from worker ${clientId} as this worker is working`);
+
+                //release();
+    
+                
+                return;
+    
+            }
             
             
             this.workers[message.queue][clientId].status = "ready";
@@ -639,7 +649,7 @@ module.exports = class Router
                         for(var workerId of Object.keys(_this.workers[queue]))
                         {   
                             var worker = _this.workers[queue][workerId];
-                            console.log(`Inspecting worker ${JSON.stringify(worker, null, "\t")}`);
+                            console.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
                             
                             if(worker.status == "working")
                             {   
