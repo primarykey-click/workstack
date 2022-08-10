@@ -256,9 +256,10 @@ module.exports = class Router
                         {   received: received,
                             workId: message.id,
                             data: message.data,
-                            producerId: clientId
+                            producerId: clientId,
+                            async: message.async ? message.async : false
                         });
-                    this.cache.save();
+                    //this.cache.save();
 
                     var readyWorkerId = await this.reserveReadyWorker(message);
 
@@ -288,14 +289,21 @@ module.exports = class Router
                     //    {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
                     //this.cache.save();
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
-                    await this.cache.save();
+                    //await this.cache.save();
                     await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
                     //await this.setWorkerReady(clientId, message, true);
 
-                    console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
-                    //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
-                    var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
-                    await this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
+                    if(!message.async)
+                    {   console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
+                        //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
+                        var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
+                        await this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
+                    }
+                    else
+                    {   
+                        console.log(`Message ${message.id} from producer ${message.producerId} is async: not sending output to producer.`);
+
+                    }
 
                 break;
 
@@ -489,6 +497,7 @@ module.exports = class Router
                     queue: queue,
                     workId: workItem.workId,
                     data: workItem.data,
+                    async: workItem.async ? workItem.async : false,
                     producerId: workItem.producerId
                 }, clientPublicKey);
 
@@ -518,7 +527,7 @@ module.exports = class Router
                     producerId: workItem.producerId,
                     data: workItem.data
                 });
-            _this.cache.save();
+            //_this.cache.save();
 
         }
         finally
@@ -717,7 +726,7 @@ module.exports = class Router
                                 });
 
                             _this.cache.delete(`/queues/${pendingWork.queue}/worked/${pendingWork.workId}`);
-                            _this.cache.save();
+                            //_this.cache.save();
 
                             delete _this.workPendingStart[workerId];
                             delete _this.workers[pendingWork.queue][workerId];

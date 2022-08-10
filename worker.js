@@ -100,6 +100,7 @@ module.exports = class Worker
                                     queue: message.queue,
                                     workId: message.workId,
                                     producerId: message.producerId,
+                                    async: message.async,
                                     output: JSON.stringify(output)
                                 });
                             

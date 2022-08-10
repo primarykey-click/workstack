@@ -61,7 +61,12 @@ module.exports = class Producer
             producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
 
             
-            await producer.send(JSON.stringify({id: uuidEmit(), command: "setGetKey", publicKey: this.keyPair.publicKey.toString("utf8")}));
+            await producer.send(JSON.stringify(
+                {   id: uuidEmit(), 
+                    command: "setGetKey", 
+                    publicKey: this.keyPair.publicKey.toString("utf8")
+                }));
+                
             var [ routerPublicKeyMessageRaw ] = await producer.receive();
             var routerPublicKey = JSON.parse(routerPublicKeyMessageRaw.toString("utf8")).publicKey;
         
