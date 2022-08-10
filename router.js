@@ -154,7 +154,7 @@ module.exports = class Router
             catch(err)
             {
                 console.log(`Error decrypting message.  Key length: ${this.keyLength}`);
-                console.log(`Message: `, JSON.stringify(message, null, "\t"));
+                console.log(`Message: `, JSON.stringify(rawMessage, null, "\t"));
                 
                 throw(err);
 
@@ -445,7 +445,7 @@ module.exports = class Router
 
             var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
             
-            _this.sendMessage(workerId,
+            await _this.sendMessage(workerId,
                 {   command: "execWork",
                     queue: queue,
                     workId: workItem.workId,
@@ -538,7 +538,7 @@ module.exports = class Router
         if(this.encrypt)
         {
             this.workers[message.queue][clientId].publicKey = message.publicKey;
-            this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+            await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
 
         }
     
@@ -547,38 +547,38 @@ module.exports = class Router
     }
 
 
-    sendMessage(clientId, message, clientPublicKey)
+    async sendMessage(clientId, message, clientPublicKey)
     {   
         //this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
 
         var modifiedMessage = message;
 
-        if(!message.id)
-        {   modifiedMessage.id = uuidEmit();            
-        }
+        
+        const release = await this.mutex.acquire();
 
-        if(message.command == "setKey" || !this.encrypt)
+        try
         {   
-            this.router.send([clientId, JSON.stringify(modifiedMessage)]);
+            if(!message.id)
+            {   modifiedMessage.id = uuidEmit();            
+            }
+
+            if(message.command == "setKey" || !this.encrypt)
+            {   
+                this.router.send([clientId, JSON.stringify(modifiedMessage)]);
+
+            }
+            else
+            {   
+                var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), clientPublicKey, this.encryptAlgorithm);
+                
+                this.router.send([clientId, JSON.stringify(encryptedMessage)]);
+
+            }
 
         }
-        else
+        finally
         {   
-            /*var cipher = crypto.createCipheriv(this.encryptAlgorithm, Buffer.from(this.encryptPassword, "hex"), this.encryptIv);
-            var encryptedMessageContent = cipher.update(JSON.stringify(modifiedMessage));
-            encryptedMessageContent = Buffer.concat([encryptedMessageContent], cipher.final()).toString("base64");
-            var encryptedMessageContent = cipher.update();
-            var encryptedMessage = 
-                {   encrypted: true, 
-                    encryptedPassword: this.encryptedEncryptPassword, 
-                    encryptedIv: this.encryptedEncryptIv, 
-                    encryptedContent: encryptedMessageContent
-                };*/
-
-            var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), clientPublicKey, this.encryptAlgorithm);
-            //function(message, publicKey, password, iv, algorithm)
-            
-            this.router.send([clientId, JSON.stringify(encryptedMessage)]);
+            release();
 
         }
         
