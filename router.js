@@ -554,10 +554,10 @@ module.exports = class Router
         var modifiedMessage = message;
 
         
-        //const release = await this.mutex.acquire();
-
         try
         {   
+            const release = await this.mutex.acquire();
+
             if(!message.id)
             {   modifiedMessage.id = uuidEmit();            
             }
@@ -578,7 +578,7 @@ module.exports = class Router
         }
         finally
         {   
-            //release();
+            release();
 
         }
         
