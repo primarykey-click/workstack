@@ -514,7 +514,7 @@ module.exports = class Router
         {   
             if(this.workPendingStart[clientId])
             {
-                console.log(`Ignorming ready command from worker ${clientId} as this worker has work pending start`);
+                console.log(`Ignoring ready command from worker ${clientId} as this worker has work pending start`);
 
                 release();
     

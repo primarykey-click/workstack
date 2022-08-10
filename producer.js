@@ -18,7 +18,6 @@ module.exports = class Producer
 
     constructor(args)
     {
-        this.producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
         this.routerAddress = args.routerAddress ? args.routerAddress : this.routerAddress;
         this.routerPort = args.routerPort ? args.routerPort : this.routerPort;
         this.authKey = args.authKey ? args.authKey : this.authKey;
@@ -47,49 +46,57 @@ module.exports = class Producer
 
     async enqueue(message, wait)
     {   
-         if(!message.id)
-        {   message.id = uuidEmit();
-        }
+        var producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
+        
+        try  
+        {
+            if(!message.id)
+            {   message.id = uuidEmit();
+            }
+                
+            if(this.authKey)
+            {   message.authKey = this.authKey;
+            }
+
+            producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
+
             
-        if(this.authKey)
-        {   message.authKey = this.authKey;
-        }
-
-        this.producer.connect(`tcp://${this.routerAddress}:${this.routerPort}`);
-
+            await producer.send(JSON.stringify({id: uuidEmit(), command: "setGetKey", publicKey: this.keyPair.publicKey.toString("utf8")}));
+            var [ routerPublicKeyMessageRaw ] = await producer.receive();
+            var routerPublicKey = JSON.parse(routerPublicKeyMessageRaw.toString("utf8")).publicKey;
         
-        await this.producer.send(JSON.stringify({id: uuidEmit(), command: "setGetKey", publicKey: this.keyPair.publicKey.toString("utf8")}));
-        var [ routerPublicKeyMessageRaw ] = await this.producer.receive();
-        var routerPublicKey = JSON.parse(routerPublicKeyMessageRaw.toString("utf8")).publicKey;
-       
-        
-        console.log(`Sending message with ID ${JSON.stringify(message.id)}`);
+            
+            console.log(`Sending message with ID ${JSON.stringify(message.id)}`);
 
-        var modifiedMessage = message;
+            var modifiedMessage = message;
 
-        if(this.encrypt)
-        {   
-            modifiedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), routerPublicKey, this.encryptAlgorithm);
+            if(this.encrypt)
+            {   
+                modifiedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), routerPublicKey, this.encryptAlgorithm);
 
-        }
+            }
 
-        await this.producer.send(JSON.stringify(modifiedMessage));
+            await producer.send(JSON.stringify(modifiedMessage));
 
 
-        var output = {};
+            var output = {};
 
-        if(wait)
-        {   var [ outputRaw ] = await this.producer.receive();
-            output = JSON.parse(outputRaw.toString("utf8"));
+            if(wait)
+            {   var [ outputRaw ] = await producer.receive();
+                output = JSON.parse(outputRaw.toString("utf8"));
 
-            if(output.encrypted)
-            {   output = JSON.parse(WorkStackCrypto.decryptMessage(output, this.keyPair.privateKey, output.algorithm));              
+                if(output.encrypted)
+                {   output = JSON.parse(WorkStackCrypto.decryptMessage(output, this.keyPair.privateKey, output.algorithm));              
+                }
+
             }
 
         }
+        finally
+        {
+            producer.close();
 
-
-        this.producer.close();
+        }
 
 
         return output;
