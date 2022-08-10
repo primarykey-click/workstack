@@ -128,7 +128,7 @@ module.exports = class Router
         this.cache = new JsonDB(new JsonDbConfig(this.cacheFile, false, true, "/"));
         
         if(!fs.existsSync(`${this.dbDir}/workstack`))
-        {   fs.mkdirSync(`${this.dbDir}/workstack`);            
+        {   fs.mkdirSync(`${this.dbDir}/workstack`, {recursive: true});            
         }
 
         this.db = new PouchDB(`${this.dbDir}/workstack`);
