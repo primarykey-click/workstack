@@ -638,6 +638,9 @@ module.exports = class Router
                     {   
                         for(var workerId of Object.keys(_this.workers[queue]))
                         {   
+                            var worker = _this.workers[queue][workerId];
+                            console.log(`Inspecting worker ${JSON.stringify(worker, null, "\t")}`);
+                            
                             var status = _this.workers[queue][workerId].status;
                             if(status == "working")
                             {   
