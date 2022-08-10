@@ -99,8 +99,6 @@ module.exports = class Router
         var app = express();
         app.get("/workers", async function(req, res, next)
             {   
-                //const release = await _this.mutex.acquire();    
-                    
                 try
                 {   
                     var workers = _this.getWorkers(req.query.queue);
@@ -112,9 +110,21 @@ module.exports = class Router
                     next(err);
 
                 }
-                finally
+                                
+            });
+
+
+        app.get("/diagnostics", async function(req, res, next)
+            {   
+                try
+                {   
+                    var diagnostics = _this.getDiagnostics();
+                    res.json(diagnostics);
+
+                }
+                catch(err)
                 {
-                    //release();
+                    next(err);
 
                 }
                                 
@@ -308,13 +318,13 @@ module.exports = class Router
                 break;
 
 
-                case "getDiagnostics":
+                /*case "getDiagnostics":
 
                     var diagnostics = this.getDiagnostics();
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
                     await this.sendMessage(clientId, {id: uuidEmit(), diagnostics: diagnostics}, clientPublicKey);
 
-                break;
+                break;*/
 
 
                 /*case "getWorkers":
