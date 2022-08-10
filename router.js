@@ -621,6 +621,13 @@ module.exports = class Router
                     {   
                         for(var workerId of Object.keys(_this.workers[queue]))
                         {   
+                            var status = _this.workers[queue][workerId].status;
+                            if(status = "working")
+                            {   
+                                continue;
+                                                                
+                            }
+                            
                             var lastActivity = _this.workers[queue][workerId].lastActivity;
                             var now = (new Date()).getTime();
                             
