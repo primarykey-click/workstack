@@ -66,7 +66,8 @@ module.exports = class Worker
 
         this.worker.connect(`tcp://${this.routerAddress}:${this.routerPort}`)
 
-        await this.sendReady();
+        this.status = "ready";
+        await this.sendStatus("ready");
 
         this.pingRouter();
 
@@ -102,7 +103,8 @@ module.exports = class Worker
                                     output: JSON.stringify(output)
                                 });
                             
-                            //await _this.sendReady();
+                            _this.status = "ready";
+                            await _this.sendStatus("ready");
 
                         }
                         finally
@@ -158,22 +160,7 @@ module.exports = class Worker
 
         setTimeout(async function()
             {   
-                var release = await _this.mutex.acquire();
-
-                try
-                {   
-                    if(_this.status == "ready")
-                    {   
-                        await _this.sendReady();
-
-                    }
-
-                }
-                finally
-                {
-                    release();
-
-                }
+                await _this.sendStatus("online");
                 
                 _this.pingRouter();
 
@@ -222,18 +209,18 @@ module.exports = class Worker
     }
 
 
-    async sendReady()
+    async sendStatus(status)
     {   
         if(this.debug)
-        {   console.log(`[${(new Date()).toString()}] Sending ready`);            
+        {   console.log(`[${(new Date()).toString()}] Sending status ${status}`);            
         }
 
-        this.status = "ready";
+        //this.status = "ready";
 
         if(this.encrypt)
         {   
             await this.sendMessage(
-                {   command: "ready", 
+                {   command: status, 
                     queue: this.queue, 
                     publicKey: this.keyPair.publicKey.toString("utf8")
                 });
@@ -242,7 +229,7 @@ module.exports = class Worker
         else
         {   
             await this.sendMessage(
-                {   command: "ready", 
+                {   command: status, 
                     queue: this.queue
                 });
 
