@@ -66,7 +66,7 @@ module.exports = class Worker
 
         this.worker.connect(`tcp://${this.routerAddress}:${this.routerPort}`)
 
-        this.sendReady();
+        await this.sendReady();
 
         this.pingRouter();
 
@@ -75,7 +75,7 @@ module.exports = class Worker
         this.worker.on("message", async function(msg)
             {   
                 var rawMessage = JSON.parse(msg.toString("utf8"));
-                var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, _this.keyPair.privateKey, rawMessage.algorithm)) : rawMessage;
+                var message = rawMessage.encrypted ? JSON.parse(WorkStackCrypto.decryptMessage(rawMessage, _this.keyPair.privateKey)) : rawMessage;
 
                 if(message.command != "setKey") 
                 {   console.log(`Received message with ID ${message.id} and command ${message.command}`);
@@ -86,15 +86,15 @@ module.exports = class Worker
                 {
                     case "execWork":
                         
-                        var release = await _this.mutex.acquire();
+                        //var release = await _this.mutex.acquire();
 
                         try
                         {   
                             _this.status = "working";
-                            _this.sendMessage({command: "working"});
+                            await _this.sendMessage({command: "working"});
                             
                             var output = await _this.worker.work({workId: message.workId, data: message.data});
-                            _this.sendMessage(
+                            await _this.sendMessage(
                                 {   command: "workComplete",
                                     queue: message.queue,
                                     workId: message.workId,
@@ -102,12 +102,12 @@ module.exports = class Worker
                                     output: JSON.stringify(output)
                                 });
                             
-                            _this.sendReady();
+                            await _this.sendReady();
 
                         }
                         finally
                         {
-                            release();
+                            //release();
 
                         }
 
@@ -117,7 +117,7 @@ module.exports = class Worker
 
                     case "setKey":
                         
-                        var release = await _this.mutex.acquire();
+                        //var release = await _this.mutex.acquire();
 
                         try
                         {   
@@ -126,7 +126,7 @@ module.exports = class Worker
                         }
                         finally
                         {
-                            release();
+                            //release();
 
                         }
 
@@ -145,7 +145,7 @@ module.exports = class Worker
 
     exitClean()
     {   
-        this.sendMessage({command: "offline", queue: this.queue});
+        await this.sendMessage({command: "offline", queue: this.queue});
         this.worker.close();
         process.exit();
 
@@ -164,7 +164,7 @@ module.exports = class Worker
                 {   
                     if(_this.status == "ready")
                     {   
-                        _this.sendReady();
+                        await _this.sendReady();
 
                     }
 
@@ -182,7 +182,7 @@ module.exports = class Worker
     }
 
 
-    sendMessage(message)
+    async sendMessage(message)
     {   
         var modifiedMessage = message;
 
@@ -207,14 +207,14 @@ module.exports = class Worker
 
         if(message.command == "ready" || !this.encrypt)
         {
-            this.worker.send([JSON.stringify(modifiedMessage)]);
+            await this.worker.send([JSON.stringify(modifiedMessage)]);
 
         }
         else
         {   
             var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), this.routerPublicKey, this.encryptAlgorithm);
             
-            this.worker.send([JSON.stringify(encryptedMessage)]);
+            await this.worker.send([JSON.stringify(encryptedMessage)]);
 
         }
         
@@ -222,7 +222,7 @@ module.exports = class Worker
     }
 
 
-    sendReady()
+    async sendReady()
     {   
         if(this.debug)
         {   console.log(`[${(new Date()).toString()}] Sending ready`);            
@@ -232,7 +232,7 @@ module.exports = class Worker
 
         if(this.encrypt)
         {   
-            this.sendMessage(
+            await this.sendMessage(
                 {   command: "ready", 
                     queue: this.queue, 
                     publicKey: this.keyPair.publicKey.toString("utf8")
@@ -241,7 +241,7 @@ module.exports = class Worker
         }
         else
         {   
-            this.sendMessage(
+            await this.sendMessage(
                 {   command: "ready", 
                     queue: this.queue
                 });
