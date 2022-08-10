@@ -99,7 +99,7 @@ module.exports = class Router
         var app = express();
         app.get("/workers", async function(req, res, next)
             {   
-                const release = await _this.mutex.acquire();    
+                //const release = await _this.mutex.acquire();    
                     
                 try
                 {   
@@ -114,7 +114,7 @@ module.exports = class Router
                 }
                 finally
                 {
-                    release();
+                    //release();
 
                 }
                                 
@@ -333,7 +333,7 @@ module.exports = class Router
         var readyWorkerId = null;
 
 
-        var release = await this.mutex.acquire();
+        //var release = await this.mutex.acquire();
 
         try
         {   
@@ -396,7 +396,7 @@ module.exports = class Router
         }
         finally
         {
-            release();
+            //release();
 
         }
 
@@ -411,7 +411,7 @@ module.exports = class Router
         var _this = this;
 
 
-        var release = await this.mutex.acquire();
+        //var release = await this.mutex.acquire();
 
         try
         {
@@ -497,7 +497,7 @@ module.exports = class Router
         }
         finally
         {
-            release();
+            //release();
 
         }
 
@@ -506,7 +506,7 @@ module.exports = class Router
 
     async setWorkerReady(clientId, message)
     {   
-        var _this = this;
+        //var _this = this;
 
         if(this.debug)
         {   console.log(`Setting worker status for ${clientId} to ready`);            
@@ -521,7 +521,7 @@ module.exports = class Router
         }
 
 
-        const release = await this.mutex.acquire();
+        //const release = await this.mutex.acquire();
 
         try
         {   
@@ -529,7 +529,7 @@ module.exports = class Router
             {
                 console.log(`Ignoring ready command from worker ${clientId} as this worker has work pending start`);
 
-                release();
+                //release();
     
                 
                 return;
@@ -543,7 +543,7 @@ module.exports = class Router
         }
         finally
         {
-            release();
+            //release();
 
         }
 
@@ -555,7 +555,7 @@ module.exports = class Router
 
         }
     
-        this.startWork(clientId, message.queue);
+        await this.startWork(clientId, message.queue);
 
     }
 
