@@ -249,7 +249,7 @@ module.exports = class Router
                             pendingSince: (new Date()).getTime()
                         }*/
 
-                        this.startWork(readyWorkerId, message.queue);
+                        await this.startWork(readyWorkerId, message.queue);
 
                     }
                     else
@@ -287,13 +287,13 @@ module.exports = class Router
                 break;
 
 
-                case "getWorkers":
+                /*case "getWorkers":
 
                     var workers = this.getWorkers(message.queue);
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
                     await this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
 
-                break;
+                break;*/
 
 
                 case "getWorkResult":
@@ -554,7 +554,7 @@ module.exports = class Router
         var modifiedMessage = message;
 
         
-        const release = await this.mutex.acquire();
+        //const release = await this.mutex.acquire();
 
         try
         {   
@@ -578,7 +578,7 @@ module.exports = class Router
         }
         finally
         {   
-            release();
+            //release();
 
         }
         
