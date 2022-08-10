@@ -577,14 +577,14 @@ module.exports = class Router
 
             if(message.command == "setKey" || !this.encrypt)
             {   
-                this.router.send([clientId, JSON.stringify(modifiedMessage)]);
+                await this.router.send([clientId, JSON.stringify(modifiedMessage)]);
 
             }
             else
             {   
                 var encryptedMessage = WorkStackCrypto.encryptMessage(JSON.stringify(modifiedMessage), clientPublicKey, this.encryptAlgorithm);
                 
-                this.router.send([clientId, JSON.stringify(encryptedMessage)]);
+                await this.router.send([clientId, JSON.stringify(encryptedMessage)]);
 
             }
 
