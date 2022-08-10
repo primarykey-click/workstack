@@ -99,6 +99,8 @@ module.exports = class Router
         var app = express();
         app.get("/workers", async function(req, res, next)
             {   
+                const release = await _this.mutex.acquire();    
+                    
                 try
                 {   
                     var workers = _this.getWorkers(req.query.queue);
@@ -108,6 +110,11 @@ module.exports = class Router
                 catch(err)
                 {
                     next(err);
+
+                }
+                finally
+                {
+                    release();
 
                 }
                                 
