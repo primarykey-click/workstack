@@ -38,7 +38,8 @@ module.exports = class Router
 
 
     constructor(args)
-    {   this.router = new zmq.Router();
+    {   
+        this.router = new zmq.Router({sendHighWaterMark: 0, recieveHighWaterMark: 0});
         //this.events = this.router.events;
         
         this.listenPort = args.listenPort ? args.listenPort : this.listenPort;
