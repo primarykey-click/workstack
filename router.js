@@ -282,6 +282,7 @@ module.exports = class Router
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
                     await this.cache.save();
                     await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
+                    await this.setWorkerReady(clientId, message, true);
 
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
                     //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
@@ -521,7 +522,7 @@ module.exports = class Router
     }
 
 
-    async setWorkerReady(clientId, message)
+    async setWorkerReady(clientId, message, force)
     {   
         //var _this = this;
 
@@ -552,7 +553,7 @@ module.exports = class Router
                 return;
     
             }
-            else if(this.workers[message.queue][clientId].status == "working")
+            else if(!force && this.workers[message.queue][clientId].status == "working")
             {
                 console.log(`Ignoring ready command from worker ${clientId} as this worker is working`);
 

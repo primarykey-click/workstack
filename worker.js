@@ -102,7 +102,7 @@ module.exports = class Worker
                                     output: JSON.stringify(output)
                                 });
                             
-                            await _this.sendReady();
+                            //await _this.sendReady();
 
                         }
                         finally
