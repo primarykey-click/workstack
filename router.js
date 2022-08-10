@@ -212,7 +212,7 @@ module.exports = class Router
                     }
 
                     this.producers[clientId].publicKey = message.publicKey;
-                    this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")}, null);
+                    await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")}, null);
                     //console.log(this.producers);
 
                 break;
@@ -273,7 +273,7 @@ module.exports = class Router
                     console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
                     //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
                     var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
-                    this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
+                    await this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
 
                 break;
 
@@ -282,7 +282,7 @@ module.exports = class Router
 
                     var diagnostics = this.getDiagnostics();
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                    this.sendMessage(clientId, {id: uuidEmit(), diagnostics: diagnostics}, clientPublicKey);
+                    await this.sendMessage(clientId, {id: uuidEmit(), diagnostics: diagnostics}, clientPublicKey);
 
                 break;
 
@@ -291,7 +291,7 @@ module.exports = class Router
 
                     var workers = this.getWorkers(message.queue);
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                    this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
+                    await this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
 
                 break;
 
@@ -303,7 +303,7 @@ module.exports = class Router
                     console.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
                     //this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                    this.sendMessage(clientId, {id: uuidEmit(), workResult: workResult}, clientPublicKey);
+                    await this.sendMessage(clientId, {id: uuidEmit(), workResult: workResult}, clientPublicKey);
 
                 break;
 
@@ -554,7 +554,7 @@ module.exports = class Router
         var modifiedMessage = message;
 
         
-        const release = await this.mutex.acquire();
+        //const release = await this.mutex.acquire();
 
         try
         {   
@@ -578,7 +578,7 @@ module.exports = class Router
         }
         finally
         {   
-            release();
+            //release();
 
         }
         
