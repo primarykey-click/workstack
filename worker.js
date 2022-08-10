@@ -137,13 +137,13 @@ module.exports = class Worker
             });
 
 
-        process.on("SIGINT", function(){_this.exitClean();});
-        process.on("SIGTERM", function(){_this.exitClean();});
+        process.on("SIGINT", async function(){await _this.exitClean();});
+        process.on("SIGTERM", async function(){await _this.exitClean();});
 
     }
 
 
-    exitClean()
+    async exitClean()
     {   
         await this.sendMessage({command: "offline", queue: this.queue});
         this.worker.close();
