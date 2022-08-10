@@ -354,14 +354,13 @@ module.exports = class Router
             }
 
 
-            while(true)
+            /*while(true)
             {   
                 if(nextWorkerIndex >= workerIds.length)
                 {   nextWorkerIndex = 0;
                     timesWrapped++;
                 }
 
-                //console.log(`Next worker index: ${nextWorkerIndex}, times wrapped: ${timesWrapped}`);
                 var nextWorkerId = workerIds[nextWorkerIndex];
 
                 var worker = _this.workers[message.queue][nextWorkerId];
@@ -372,8 +371,6 @@ module.exports = class Router
 
                     _this.lastWorkerIndex = nextWorkerIndex;
                     readyWorkerId =  nextWorkerId;
-
-                    //_this.workers[message.queue][readyWorkerId].status = "working";
 
                     break;
 
@@ -388,6 +385,26 @@ module.exports = class Router
                         break;
 
                     }
+
+                }
+
+            }*/
+
+            for(var workerId of workerIds)
+            {   
+                var worker = _this.workers[message.queue][workerId];
+
+                if(worker.status == "ready")
+                {   
+                    console.log(`Reserving worker ${workerId}`);
+                    readyWorkerId =  workerId;
+
+                    break;
+
+                }
+                else
+                {   
+                    console.log(`Worker ${workerId} not ready.  Worker status: ${worker.status}.  Total workers: ${workerIds.length}`);
 
                 }
 
