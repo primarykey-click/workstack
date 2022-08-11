@@ -356,7 +356,7 @@ module.exports = class Router
 
     async reserveReadyWorker(message)
     {   
-        var _this = this;
+        //var _this = this;
         var readyWorkerId = null;
 
 
@@ -364,13 +364,13 @@ module.exports = class Router
 
         try
         {   
-            if(!_this.workers[message.queue])
-            {   _this.workers[message.queue] = {};            
+            if(!this.workers[message.queue])
+            {   this.workers[message.queue] = {};            
             }
 
-            var workerIds = Object.keys(_this.workers[message.queue]);
-            var nextWorkerIndex = _this.lastWorkerIndex + 1;
-            var timesWrapped = 0;
+            var workerIds = Object.keys(this.workers[message.queue]);
+            //var nextWorkerIndex = this.lastWorkerIndex + 1;
+            //var timesWrapped = 0;
 
             if(workerIds.length == 0)
             {   
@@ -419,7 +419,7 @@ module.exports = class Router
 
             for(var workerId of workerIds)
             {   
-                var worker = _this.workers[message.queue][workerId];
+                var worker = this.workers[message.queue][workerId];
 
                 if(worker.status == "ready")
                 {   
@@ -557,6 +557,9 @@ module.exports = class Router
 
         if(!this.workers[message.queue] || !this.workers[message.queue][clientId])
         {   await this.setWorkerReady(clientId, message);
+        }
+        else
+        {   this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();            
         }
 
     }
