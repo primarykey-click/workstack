@@ -293,7 +293,7 @@ module.exports = class Router
 
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
                     //await this.cache.save();
-                    await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
+                    this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
 
                     if(!message.async)
                     {   console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
