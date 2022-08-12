@@ -114,6 +114,23 @@ module.exports = class Router
             });
 
 
+        app.get("/queueData", async function(req, res, next)
+            {   
+                try
+                {   
+                    var queueData = _this.getQueueData();
+                    res.json(queueData);
+
+                }
+                catch(err)
+                {
+                    next(err);
+
+                }
+                                
+            });
+
+
         app.get("/diagnostics", async function(req, res, next)
             {   
                 try
@@ -156,13 +173,6 @@ module.exports = class Router
 
 
         this.cleanup();
-
-
-        /*for await (var event of this.events)
-        {
-            console.log(`Event of type ${event.type} fired`);
-
-        }*/
 
 
         for await (var [id, msg] of this.router)
@@ -229,13 +239,6 @@ module.exports = class Router
                 break;
 
 
-                /*case "setKey":
-                
-                    this.producers[clientId].publicKey = message.publicKey;
-
-                break;*/
-
-
                 case "setGetKey":
 
                     if(!this.producers[clientId])
@@ -244,7 +247,6 @@ module.exports = class Router
 
                     this.producers[clientId].publicKey = message.publicKey;
                     await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")}, null);
-                    //console.log(this.producers);
 
                 break;
 
@@ -275,12 +277,6 @@ module.exports = class Router
 
                     if(readyWorkerId)
                     {   
-                        /*this.workPendingStart[readyWorkerId] = 
-                        {   queue: message.queue,
-                            workId: message.id,
-                            pendingSince: (new Date()).getTime()
-                        }*/
-
                         await this.startWork(readyWorkerId, message.queue);
 
                     }
@@ -295,17 +291,12 @@ module.exports = class Router
                     
                     console.log(`Work for message ${message.id} completed by ${clientId}.`);
 
-                    //this.cache.push(`/queues/${message.queue}/worked/${message.workId}`,
-                    //    {completed: (new Date()).getTime(), status: "complete", output: message.output}, false);
-                    //this.cache.save();
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
                     //await this.cache.save();
                     await this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
-                    //await this.setWorkerReady(clientId, message, true);
 
                     if(!message.async)
                     {   console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
-                        //this.router.send([message.producerId, JSON.stringify({id: uuidEmit(), output: JSON.parse(message.output)})]);
                         var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
                         await this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
                     }
@@ -318,30 +309,11 @@ module.exports = class Router
                 break;
 
 
-                /*case "getDiagnostics":
-
-                    var diagnostics = this.getDiagnostics();
-                    var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                    await this.sendMessage(clientId, {id: uuidEmit(), diagnostics: diagnostics}, clientPublicKey);
-
-                break;*/
-
-
-                /*case "getWorkers":
-
-                    var workers = this.getWorkers(message.queue);
-                    var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
-                    await this.sendMessage(clientId, {id: uuidEmit(), workers: workers}, clientPublicKey);
-
-                break;*/
-
-
                 case "getWorkResult":
 
                     var workResult = await this.getWorkResult(message.workId);
 
                     console.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
-                    //this.router.send([clientId, JSON.stringify({id: uuidEmit(), workResult: workResult})]);
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
                     await this.sendMessage(clientId, {id: uuidEmit(), workResult: workResult}, clientPublicKey);
 
@@ -779,8 +751,8 @@ module.exports = class Router
 
 
     getWorkers(queue)
-    {   var workers = this.workers[queue];
-        //console.log("Workers:" , workers);
+    {   
+        var workers = this.workers[queue];
 
         return workers ? workers : {};
 
@@ -790,6 +762,13 @@ module.exports = class Router
     getQueues()
     {
         return this.workers ? this.workers : {};
+
+    }
+
+
+    getQueueData()
+    {
+        return this.cache.getData("/queues");
 
     }
 
