@@ -767,8 +767,33 @@ module.exports = class Router
 
 
     getQueueData()
-    {
-        return this.cache.getData("/queues");
+    {   
+        var queueData = [];
+
+        try
+        {
+            queueData = this.cache.getData("/queues");
+
+        }
+        catch(err)
+        {
+            if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
+            {
+                if(_this.debug)
+                {   console.log(`No work items in queue ${queue}`);
+                }
+
+            }
+            else
+            {   console.log(err);                       
+            }
+
+        }
+        
+        
+        return queueData;
+
+
 
     }
 
