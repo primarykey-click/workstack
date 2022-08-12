@@ -773,6 +773,7 @@ module.exports = class Router
         try
         {
             queueData = this.cache.getData("/queues");
+            console.log(queueData);
 
         }
         catch(err)
