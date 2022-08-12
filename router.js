@@ -779,7 +779,7 @@ module.exports = class Router
         {
             if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
             {
-                if(_this.debug)
+                if(this.debug)
                 {   console.log(`No work items in queue ${queue}`);
                 }
 
