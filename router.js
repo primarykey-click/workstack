@@ -119,7 +119,15 @@ module.exports = class Router
                 try
                 {   
                     var queueData = _this.getQueueData();
-                    res.json(queueData);
+                    var queueDataFiltered = {};
+
+                    for(var itemKey of Object.keys(queueData))
+                    {   var item = queueData[itemKey];
+                        queueDataFiltered[itemKey] = item["not-started"].length;
+                    }
+
+
+                    res.json(queueDataFiltered);
 
                 }
                 catch(err)
