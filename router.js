@@ -97,11 +97,30 @@ module.exports = class Router
         var _this = this;
 
         var app = express();
+        
+        
         app.get("/workers", async function(req, res, next)
             {   
                 try
                 {   
                     var workers = _this.getWorkers(req.query.queue);
+                    res.json(workers);
+
+                }
+                catch(err)
+                {
+                    next(err);
+
+                }
+                                
+            });
+
+
+        app.get("/findWorkers", async function(req, res, next)
+            {   
+                try
+                {   
+                    var workers = _this.findWorkers(req.query.queueExpr);
                     res.json(workers);
 
                 }

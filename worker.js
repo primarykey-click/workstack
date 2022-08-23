@@ -150,6 +150,8 @@ module.exports = class Worker
     {   
         await this.sendMessage({command: "offline", queue: this.queue});
         this.worker.close();
+        console.log("Closed worker socket");
+        
         process.exit();
 
     }
