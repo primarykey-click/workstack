@@ -349,8 +349,6 @@ module.exports = class Router
             }
 
             var workerIds = Object.keys(this.workers[message.queue]);
-            //var nextWorkerIndex = this.lastWorkerIndex + 1;
-            //var timesWrapped = 0;
 
             if(workerIds.length == 0)
             {   
@@ -360,42 +358,6 @@ module.exports = class Router
 
             }
 
-
-            /*while(true)
-            {   
-                if(nextWorkerIndex >= workerIds.length)
-                {   nextWorkerIndex = 0;
-                    timesWrapped++;
-                }
-
-                var nextWorkerId = workerIds[nextWorkerIndex];
-
-                var worker = _this.workers[message.queue][nextWorkerId];
-
-                if(worker.status == "ready")
-                {   
-                    console.log(`Reserving worker ${nextWorkerId}`);
-
-                    _this.lastWorkerIndex = nextWorkerIndex;
-                    readyWorkerId =  nextWorkerId;
-
-                    break;
-
-                }
-                else
-                {   
-                    console.log(`Worker ${nextWorkerId} not ready.  Worker status: ${worker.status}`);
-                    nextWorkerIndex++;
-
-                    if((nextWorkerIndex > _this.lastWorkerIndex && timesWrapped > 0) || timesWrapped > 1)
-                    {
-                        break;
-
-                    }
-
-                }
-
-            }*/
 
             for(var workerId of workerIds)
             {   
@@ -480,6 +442,14 @@ module.exports = class Router
             
             /* Send work to worker */
 
+            if(this.encrypt)
+            {
+                this.workers[message.queue][clientId].publicKey = message.publicKey;
+                await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+
+            }
+
+
             var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
             
             await _this.sendMessage(workerId,
@@ -539,7 +509,14 @@ module.exports = class Router
         {   await this.setWorkerReady(clientId, message);
         }
         else
-        {   this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();            
+        {   
+            if(this.workers[message.queue][clientId].status == "ready")
+            {   await this.setWorkerReady(clientId, message);
+            }
+            else
+            {   this.workers[message.queue][clientId].lastActivity = (new Date()).getTime();            
+            }
+
         }
 
     }
@@ -589,12 +566,12 @@ module.exports = class Router
         }
 
 
-        if(this.encrypt)
+        /*if(this.encrypt)
         {
             this.workers[message.queue][clientId].publicKey = message.publicKey;
             await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
 
-        }
+        }*/
     
         await this.startWork(clientId, message.queue);
 
