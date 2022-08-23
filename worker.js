@@ -21,6 +21,7 @@ module.exports = class Worker
     keyPair = null;
     encryptAlgorithm = "aes-256-cbc";
     routerPublicKey = null;
+    meta = {};
 
 
     constructor(args)
@@ -36,6 +37,7 @@ module.exports = class Worker
         this.encryptAlgorithm = args.encryptAlgorithm ? args.encryptAlgorithm : this.encryptAlgorithm;
         this.queue = args.queue;
         this.worker.identity = `worker-${args.workerId ? args.workerId : uuidEmit()}`;
+        this.meta = args.meta ? args.meta : this.meta;
         this.worker.work = args.work;
         this.mutex = new Mutex();
 
@@ -225,7 +227,8 @@ module.exports = class Worker
         {   
             await this.sendMessage(
                 {   command: status, 
-                    queue: this.queue, 
+                    queue: this.queue,
+                    meta: this.meta, 
                     publicKey: this.keyPair.publicKey.toString("utf8")
                 });
 
@@ -234,7 +237,8 @@ module.exports = class Worker
         {   
             await this.sendMessage(
                 {   command: status, 
-                    queue: this.queue
+                    queue: this.queue,
+                    meta: this.meta
                 });
 
         }

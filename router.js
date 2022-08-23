@@ -556,6 +556,11 @@ module.exports = class Router
         {   this.workers[message.queue][clientId] = {};
         }
 
+        
+        if(message.meta)
+        {   this.workers[message.queue][clientId].meta = message.meta;
+        }
+
 
         //const release = await this.mutex.acquire();
 
