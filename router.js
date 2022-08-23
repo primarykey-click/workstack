@@ -394,7 +394,7 @@ module.exports = class Router
 
     async startWork(workerId, queue)
     {   
-        var _this = this;
+        //var _this = this;
 
 
         //var release = await this.mutex.acquire();
@@ -444,7 +444,7 @@ module.exports = class Router
 
             if(this.encrypt)
             {
-                await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+                await this.sendMessage(workerId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
 
             }
 
