@@ -406,14 +406,14 @@ module.exports = class Router
             
             try
             {   
-                workItem = _this.cache.getData(`/queues/${queue}/not-started[-1]`);
+                workItem = this.cache.getData(`/queues/${queue}/not-started[-1]`);
 
             }
             catch(err)
             {   
                 if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
                 {
-                    if(_this.debug)
+                    if(this.debug)
                     {   console.log(`No work items in queue ${queue}`);
                     }
 
@@ -444,15 +444,14 @@ module.exports = class Router
 
             if(this.encrypt)
             {
-                this.workers[message.queue][clientId].publicKey = message.publicKey;
                 await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
 
             }
 
 
-            var clientPublicKey = _this.encrypt ? _this.workers[queue][workerId].publicKey : null;
+            var clientPublicKey = this.encrypt ? this.workers[queue][workerId].publicKey : null;
             
-            await _this.sendMessage(workerId,
+            await this.sendMessage(workerId,
                 {   command: "execWork",
                     queue: queue,
                     workId: workItem.workId,
@@ -464,22 +463,22 @@ module.exports = class Router
 
             /* Update worker status */
 
-            _this.workPendingStart[workerId] = 
+            this.workPendingStart[workerId] = 
                 {   queue: queue,
                     workId: workItem.workId,
                     pendingSince: (new Date()).getTime()
                 }
             
-            _this.workers[queue][workerId].status = "working";
+            this.workers[queue][workerId].status = "working";
             //console.log("Set working: ", new Date());
 
 
             /* Update cache */
 
-            var workItemIndex = _this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
+            var workItemIndex = this.cache.getIndex(`/queues/${queue}/not-started`, workItem.workId, "workId");
             
-            _this.cache.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
-            _this.cache.push(`/queues/${queue}/worked/${workItem.workId}`, 
+            this.cache.delete(`/queues/${queue}/not-started[${workItemIndex}]`);
+            this.cache.push(`/queues/${queue}/worked/${workItem.workId}`, 
                 {   received: workItem.received,
                     started: (new Date()).getTime(),
                     status: "in-progress",
@@ -566,12 +565,12 @@ module.exports = class Router
         }
 
 
-        /*if(this.encrypt)
+        if(this.encrypt)
         {
             this.workers[message.queue][clientId].publicKey = message.publicKey;
-            await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
+            //await this.sendMessage(clientId, {command: "setKey", publicKey: this.keyPair.publicKey.toString("utf8")});
 
-        }*/
+        }
     
         await this.startWork(clientId, message.queue);
 
