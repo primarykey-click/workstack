@@ -194,7 +194,7 @@ module.exports = class Worker
 
         }
 
-        if(message.command == "ready" || !this.encrypt)
+        if(message.command == "ready" || message.command == "online" || !this.encrypt)
         {
             await this.worker.send([JSON.stringify(modifiedMessage)]);
 
