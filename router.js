@@ -7,7 +7,7 @@ const JsonDbConfig = require("node-json-db/dist/lib/JsonDBConfig").Config;
 const { Mutex } = require("async-mutex");
 const { uuidEmit } = require("uuid-timestamp")
 const zmq = require("zeromq");
-const { fstat } = require("fs");
+//const { fstat } = require("fs");
 const WorkStackCrypto = require(`${__dirname}/local_modules/WorkStackCrypto`);
 
 PouchDB.plugin(require("pouchdb-find"));
@@ -739,6 +739,26 @@ module.exports = class Router
         var workers = this.workers[queue];
 
         return workers ? workers : {};
+
+    }
+
+
+    findWorkers(queueExpr)
+    {   
+        var workers = {};
+        
+        for(var queue of Object.keys(this.workers))
+        {
+            if(queue.match(new RegExp(queueExpr, "ig")))
+            {
+                workers = {...workers, ...this.workers[queue]}
+
+            }
+
+        }
+
+
+        return workers;
 
     }
 
