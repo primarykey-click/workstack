@@ -22,7 +22,8 @@ module.exports = class Router
     listenPort = 5000;
     managementPort = 5001;
     listenInterface = "*";
-    readyExpiry = 30000;
+    readyExpiry = 60000;
+    workingExpiry = 60 * 30 * 1000;
     cleanupInterval = 60000;
     pendingWorkExpiry = 600000;  //15000;
     encrypt = false;
@@ -49,6 +50,7 @@ module.exports = class Router
         this.replyListenPort = args.replyListenPort ? args.replyListenPort : this.replyListenPort;
         this.listenInterface = args.listenInterface ? args.listenInterface : this.listenInterface;
         this.readyExpiry = args.readyExpiry ? args.readyExpiry : this.readyExpiry;
+        this.workingExpiry = args.workingExpiry ? args.workingExpiry : this.workingExpiry;
         this.cleanupInterval = args.cleanupInterval ? args.cleanupInterval : this.cleanupInterval;
         this.pendingWorkExpiry = args.pendingWorkExpiry ? args.pendingWorkExpiry : this.pendingWorkExpiry;
         this.encrypt = args.encrypt ? args.encrypt : this.encrypt;
@@ -664,17 +666,23 @@ module.exports = class Router
                         {   
                             var worker = _this.workers[queue][workerId];
                             console.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
-                            
-                            if(worker.status == "working")
-                            {   
-                                continue;
 
-                            }
-                            
                             var lastActivity = worker.lastActivity;
                             var now = (new Date()).getTime();
                             
-                            if(now - lastActivity >= _this.readyExpiry)
+                            if(worker.status == "working")
+                            {   
+                                if(now - lastActivity >= _this.workingExpiry)
+                                {   
+                                    console.log(`Purging expired worker ${workerId} regardless of "working" state (appears to have aborted)`);
+                                    delete _this.workers[queue][workerId];
+
+                                }
+
+                                //continue;
+
+                            }
+                            else if(now - lastActivity >= _this.readyExpiry)
                             {   
                                 console.log(`Purging expired worker ${workerId}`);
                                 delete _this.workers[queue][workerId];
