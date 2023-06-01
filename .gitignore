@@ -131,4 +131,6 @@ dist
 
 
 *.code-workspace
+
 db.json
+data/crypto

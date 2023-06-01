@@ -65,7 +65,7 @@ module.exports = class Router
 
         if(this.encrypt)
         {
-            this.keyPair = crypto.generateKeyPairSync("rsa",
+            /*this.keyPair = crypto.generateKeyPairSync("rsa",
                 {   modulusLength: this.keyLength,
                     publicKeyEncoding:
                     {   type: "spki",
@@ -75,7 +75,9 @@ module.exports = class Router
                     {   type: "pkcs8",
                         format: "pem"
                     }
-                });
+                });*/
+
+            this.initKeyPair();
 
         }
 
@@ -92,6 +94,55 @@ module.exports = class Router
         }
         
     }*/
+
+
+    initKeyPair()
+    {
+        this.log("Initializing key pair");
+
+
+        if(!fs.existsSync(`./data`))
+        {   fs.mkdirSync(`./data`);
+        }
+
+        if(!fs.existsSync(`./data/crypto`))
+        {   fs.mkdirSync(`./data/crypto`);
+        }
+
+        if(!fs.existsSync(`./data/crypto/private.key`))
+        {
+            this.log(`Creating keypair.`);
+
+            this.keyPair = crypto.generateKeyPairSync("rsa",
+                {   modulusLength: this.keyLength,
+                    publicKeyEncoding:
+                    {   type: "spki",
+                        format: "pem"
+                    },
+                    privateKeyEncoding:
+                    {   type: "pkcs8",
+                        format: "pem"
+                    }
+                });
+
+            
+            fs.writeFileSync(`./data/crypto/private.key`, this.keyPair.privateKey);
+            fs.writeFileSync(`./data/crypto/public.key`, this.keyPair.publicKey);
+
+            this.log(`Created key pair.`);
+            this.log(`Private key: ./data/crypto/private.key`);
+            this.log(`Public key: data/crypto/public.key`);
+
+        }
+        else
+        {
+            this.keyPair = {};
+            this.keyPair.privateKey = fs.readFileSync(`./data/crypto/private.key`, {encoding: "utf-8"});
+            this.keyPair.publicKey = fs.readFileSync(`./data/crypto/public.key`, {encoding: "utf-8"});
+
+        }
+
+    }
 
 
     startManagementListener()
@@ -850,6 +901,13 @@ module.exports = class Router
 
 
         return diagnostics;
+
+    }
+
+
+    log(message)
+    {
+        console.log(`[${(new Date()).toLocaleString("en-ca")}] ${message}`);
 
     }
 
