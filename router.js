@@ -361,7 +361,7 @@ module.exports = class Router
 
                     }
                     else
-                    {   console.log(`[${new Date()}] No workers ready: queueing message ${message.id}`);
+                    {   this.log(`[${new Date()}] No workers ready: queueing message ${message.id}`);
                     }
 
                 break;
@@ -369,20 +369,20 @@ module.exports = class Router
 
                 case "workComplete":
                     
-                    console.log(`Work for message ${message.id} completed by ${clientId}.`);
+                    this.log(`Work for message ${message.id} completed by ${clientId}.`);
 
                     await this.cache.delete(`/queues/${message.queue}/worked/${message.workId}`);
                     //await this.cache.save();
                     this.db.put({_id: uuidEmit(), type: "workOutput", workId: message.workId, queue: message.queue, workerId: clientId, output: JSON.parse(message.output)});
 
                     if(!message.async)
-                    {   console.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
+                    {   this.log(`Sending message workComplete for message ${JSON.stringify(message.id)} to ${message.producerId}`);
                         var clientPublicKey = this.encrypt ? this.producers[message.producerId].publicKey : null;
                         await this.sendMessage(message.producerId, {id: uuidEmit(), output: JSON.parse(message.output)}, clientPublicKey);
                     }
                     else
                     {   
-                        console.log(`Message ${message.id} from producer ${message.producerId} is async: not sending output to producer.`);
+                        this.log(`Message ${message.id} from producer ${message.producerId} is async: not sending output to producer.`);
 
                     }
 
@@ -393,7 +393,7 @@ module.exports = class Router
 
                     var workResult = await this.getWorkResult(message.workId);
 
-                    console.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
+                    this.log(`Sending work result for work item ${JSON.stringify(message.workId)} to ${clientId}`);
                     var clientPublicKey = this.encrypt ? this.producers[clientId].publicKey : null;
                     await this.sendMessage(clientId, {id: uuidEmit(), workResult: workResult}, clientPublicKey);
 
@@ -424,7 +424,7 @@ module.exports = class Router
 
             if(workerIds.length == 0)
             {   
-                console.log(`No workers online`);
+                this.log(`No workers online`);
             
                 return null;
 
@@ -437,7 +437,7 @@ module.exports = class Router
 
                 if(worker.status == "ready")
                 {   
-                    console.log(`Reserving worker ${workerId}`);
+                    this.log(`Reserving worker ${workerId}`);
                     readyWorkerId =  workerId;
 
                     break;
@@ -445,7 +445,7 @@ module.exports = class Router
                 }
                 else
                 {   
-                    console.log(`Worker ${workerId} not ready.  Worker status: ${worker.status}.  Total workers: ${workerIds.length}`);
+                    this.log(`Worker ${workerId} not ready.  Worker status: ${worker.status}.  Total workers: ${workerIds.length}`);
 
                 }
 
@@ -486,7 +486,7 @@ module.exports = class Router
                 if(err.message && err.message.match(/(Can't find dataPath)|(Can't find index)/g))
                 {
                     if(this.debug)
-                    {   console.log(`No work items in queue ${queue}`);
+                    {   this.log(`No work items in queue ${queue}`);
                     }
 
                 }
@@ -502,14 +502,14 @@ module.exports = class Router
 
             if(!workItem)
             {
-                console.log(`No work items found`);
+                this.log(`No work items found`);
 
                 return;
 
             }
 
 
-            console.log(`Assigning work ${workItem.workId} to ${workerId}`);
+            this.log(`Assigning work ${workItem.workId} to ${workerId}`);
             
             
             /* Send work to worker */
@@ -573,7 +573,7 @@ module.exports = class Router
     async setWorkerOnline(clientId, message)
     {   
         if(this.debug)
-        {   console.log(`Processing online for worker ${clientId}`);            
+        {   this.log(`Processing online for worker ${clientId}`);            
         }
 
         if(!this.workers[message.queue] || !this.workers[message.queue][clientId])
@@ -598,7 +598,7 @@ module.exports = class Router
         //var _this = this;
 
         if(this.debug)
-        {   console.log(`Setting worker status for ${clientId} to ready`);            
+        {   this.log(`Setting worker status for ${clientId} to ready`);            
         }
 
         if(!this.workers[message.queue])
@@ -621,7 +621,7 @@ module.exports = class Router
         {   
             if(this.workPendingStart[clientId])
             {
-                console.log(`Ignoring ready command from worker ${clientId} as this worker has work pending start`);
+                this.log(`Ignoring ready command from worker ${clientId} as this worker has work pending start`);
 
                 //release();
     
@@ -699,7 +699,7 @@ module.exports = class Router
 
         
         if(this.debug)
-        {   console.log(`[${(new Date()).getTime()}] Cleaning up`);
+        {   this.log(`Cleaning up`);
         }
 
         
@@ -716,7 +716,10 @@ module.exports = class Router
                         for(var workerId of Object.keys(_this.workers[queue]))
                         {   
                             var worker = _this.workers[queue][workerId];
-                            console.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
+                            
+                            if(this.debug)
+                            {   this.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
+                            }
 
                             var lastActivity = worker.lastActivity;
                             var now = (new Date()).getTime();
@@ -725,7 +728,7 @@ module.exports = class Router
                             {   
                                 if(now - lastActivity >= _this.workingExpiry)
                                 {   
-                                    console.log(`Purging expired worker ${workerId} regardless of "working" state (appears to have aborted)`);
+                                    this.log(`Purging expired worker ${workerId} regardless of "working" state (appears to have aborted)`);
                                     delete _this.workers[queue][workerId];
 
                                 }
