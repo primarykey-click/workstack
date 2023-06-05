@@ -293,7 +293,10 @@ module.exports = class Router
             /*if(message.command != "ready" || (message.command == "ready" && this.debug))
             {   console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
             }*/
-            console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
+
+            if(message.command != "online")
+            {   console.log(`Received command ${message.command} within message with ID ${JSON.stringify(message.id)} from client ${clientId}`);
+            }
 
             
             switch(message.command)
@@ -717,8 +720,8 @@ module.exports = class Router
                         {   
                             var worker = _this.workers[queue][workerId];
                             
-                            if(this.debug)
-                            {   this.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
+                            if(_this.debug)
+                            {   _this.log(`Inspecting worker ${workerId}: ${JSON.stringify(worker, null, "\t")}`);
                             }
 
                             var lastActivity = worker.lastActivity;
@@ -728,7 +731,7 @@ module.exports = class Router
                             {   
                                 if(now - lastActivity >= _this.workingExpiry)
                                 {   
-                                    this.log(`Purging expired worker ${workerId} regardless of "working" state (appears to have aborted)`);
+                                    _this.log(`Purging expired worker ${workerId} regardless of "working" state (appears to have aborted)`);
                                     delete _this.workers[queue][workerId];
 
                                 }
