@@ -101,6 +101,7 @@ module.exports = class Producer
         {
             console.log("Encountered error: ", err);
 
+            producer.disconnect(`tcp://${this.routerAddress}:${this.routerPort}`);
             producer.close();
 
         }
@@ -108,8 +109,9 @@ module.exports = class Producer
         {
             if(!producer.closed)
             {   
+                producer.disconnect(`tcp://${this.routerAddress}:${this.routerPort}`);
                 producer.close();
-                
+
             }
 
         }
