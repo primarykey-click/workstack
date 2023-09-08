@@ -46,6 +46,7 @@ module.exports = class Producer
 
     async enqueue(message, wait)
     {   
+        let output = {};
         let producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
         
         try  
@@ -84,7 +85,7 @@ module.exports = class Producer
             await producer.send(JSON.stringify(modifiedMessage));
 
 
-            let output = {};
+            //let output = {};
 
             if(wait)
             {   let [ outputRaw ] = await producer.receive();
