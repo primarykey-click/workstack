@@ -97,9 +97,20 @@ module.exports = class Producer
             }
 
         }
+        catch(err)
+        {
+            console.log("Encountered error: ", err);
+
+            producer.close();
+
+        }
         finally
         {
-            producer.close();
+            if(!producer.closed)
+            {   
+                producer.close();
+                
+            }
 
         }
 
