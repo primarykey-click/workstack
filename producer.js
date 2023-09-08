@@ -6,7 +6,7 @@ const WorkStackCrypto = require(`${__dirname}/local_modules/WorkStackCrypto`);
 
 module.exports = class Producer
 {
-    producer = null;
+    //producer = null;
     routerAddress = "127.0.0.1";
     routerPort = 5000;
     authKey = null;
@@ -46,7 +46,7 @@ module.exports = class Producer
 
     async enqueue(message, wait)
     {   
-        var producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
+        let producer = new zmq.Dealer({routingId: `producer-${uuidEmit()}`});
         
         try  
         {
@@ -67,13 +67,13 @@ module.exports = class Producer
                     publicKey: this.keyPair.publicKey.toString("utf8")
                 }));
                 
-            var [ routerPublicKeyMessageRaw ] = await producer.receive();
-            var routerPublicKey = JSON.parse(routerPublicKeyMessageRaw.toString("utf8")).publicKey;
+            let [ routerPublicKeyMessageRaw ] = await producer.receive();
+            let routerPublicKey = JSON.parse(routerPublicKeyMessageRaw.toString("utf8")).publicKey;
         
             
             console.log(`Sending message with ID ${JSON.stringify(message.id)}`);
 
-            var modifiedMessage = message;
+            let modifiedMessage = message;
 
             if(this.encrypt)
             {   
@@ -84,10 +84,10 @@ module.exports = class Producer
             await producer.send(JSON.stringify(modifiedMessage));
 
 
-            var output = {};
+            let output = {};
 
             if(wait)
-            {   var [ outputRaw ] = await producer.receive();
+            {   let [ outputRaw ] = await producer.receive();
                 output = JSON.parse(outputRaw.toString("utf8"));
 
                 if(output.encrypted)
