@@ -481,7 +481,7 @@ module.exports = class Router
             
             try
             {   
-                workItem = this.cache.getData(`/queues/${queue}/not-started[-1]`);
+                workItem = this.cache.getData(`/queues/${queue}/not-started[0]`);
 
             }
             catch(err)
