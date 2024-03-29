@@ -89,7 +89,7 @@ module.exports = class Router
         {   fs.mkdirSync(`./data/crypto`);
         }
 
-        if(!fs.existsSync(privateKeyPath))
+        if(!fs.existsSync(this.privateKeyPath))
         {
             this.log(`Creating keypair.`);
 
@@ -106,12 +106,12 @@ module.exports = class Router
                 });
 
             
-            fs.writeFileSync(privateKeyPath, this.keyPair.privateKey);
-            fs.writeFileSync(publicKeyPath, this.keyPair.publicKey);
+            fs.writeFileSync(this.privateKeyPath, this.keyPair.privateKey);
+            fs.writeFileSync(this.publicKeyPath, this.keyPair.publicKey);
 
             this.log(`Created key pair.`);
-            this.log(`Private key: ${privateKeyPath}`);
-            this.log(`Public key: ${publicKeyPath}`);
+            this.log(`Private key: ${this.privateKeyPath}`);
+            this.log(`Public key: ${this.publicKeyPath}`);
 
         }
         else
