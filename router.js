@@ -38,6 +38,8 @@ module.exports = class Router
     authMethod = "none";
     authKey = "auth.key";
     lastWorkerIndex = 0;
+    privateKeyPath = "/data/crypto/private.key";
+    publicKeyPath = "./data/crypto/public.key";
 
 
     constructor(args)
@@ -61,39 +63,17 @@ module.exports = class Router
         this.dbDir = args.dbDir ? args.dbDir : this.dbDir;
         this.authMethod = args.authMethod ? args.authMethod : this.authMethod;
         this.authKey = args.authKey ? args.authKey : this.authKey;
+        this.privateKeyPath = args.privateKeyPath ? args.privateKeyPath : this.privateKeyPath;
+        this.publicKeyPath = args.publicKeyPath ? args.publicKeyPath : this.publicKeyPath;
         this.mutex = new Mutex();
 
         if(this.encrypt)
         {
-            /*this.keyPair = crypto.generateKeyPairSync("rsa",
-                {   modulusLength: this.keyLength,
-                    publicKeyEncoding:
-                    {   type: "spki",
-                        format: "pem"
-                    },
-                    privateKeyEncoding:
-                    {   type: "pkcs8",
-                        format: "pem"
-                    }
-                });*/
-
             this.initKeyPair();
 
         }
 
     }
-
-
-    /*async observe()
-    {
-        for await (var event of this.events)
-        {
-            console.log(`Event of type ${event.type} fired`);
-            console.log("Event:", JSON.stringify(event));
-
-        }
-        
-    }*/
 
 
     initKeyPair()
@@ -109,7 +89,7 @@ module.exports = class Router
         {   fs.mkdirSync(`./data/crypto`);
         }
 
-        if(!fs.existsSync(`./data/crypto/private.key`))
+        if(!fs.existsSync(privateKeyPath))
         {
             this.log(`Creating keypair.`);
 
@@ -126,19 +106,19 @@ module.exports = class Router
                 });
 
             
-            fs.writeFileSync(`./data/crypto/private.key`, this.keyPair.privateKey);
-            fs.writeFileSync(`./data/crypto/public.key`, this.keyPair.publicKey);
+            fs.writeFileSync(privateKeyPath, this.keyPair.privateKey);
+            fs.writeFileSync(publicKeyPath, this.keyPair.publicKey);
 
             this.log(`Created key pair.`);
-            this.log(`Private key: ./data/crypto/private.key`);
-            this.log(`Public key: data/crypto/public.key`);
+            this.log(`Private key: ${privateKeyPath}`);
+            this.log(`Public key: ${publicKeyPath}`);
 
         }
         else
         {
             this.keyPair = {};
-            this.keyPair.privateKey = fs.readFileSync(`./data/crypto/private.key`, {encoding: "utf-8"});
-            this.keyPair.publicKey = fs.readFileSync(`./data/crypto/public.key`, {encoding: "utf-8"});
+            this.keyPair.privateKey = fs.readFileSync(privateKeyPath, {encoding: "utf-8"});
+            this.keyPair.publicKey = fs.readFileSync(publicKeyPath, {encoding: "utf-8"});
 
         }
 
