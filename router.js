@@ -117,8 +117,8 @@ module.exports = class Router
         else
         {
             this.keyPair = {};
-            this.keyPair.privateKey = fs.readFileSync(privateKeyPath, {encoding: "utf-8"});
-            this.keyPair.publicKey = fs.readFileSync(publicKeyPath, {encoding: "utf-8"});
+            this.keyPair.privateKey = fs.readFileSync(this.privateKeyPath, {encoding: "utf-8"});
+            this.keyPair.publicKey = fs.readFileSync(this.publicKeyPath, {encoding: "utf-8"});
 
         }
 
