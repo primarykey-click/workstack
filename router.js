@@ -38,7 +38,7 @@ module.exports = class Router
     authMethod = "none";
     authKey = "auth.key";
     lastWorkerIndex = 0;
-    privateKeyPath = "/data/crypto/private.key";
+    privateKeyPath = "./data/crypto/private.key";
     publicKeyPath = "./data/crypto/public.key";
 
 
